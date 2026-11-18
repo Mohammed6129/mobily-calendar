@@ -274,6 +274,7 @@ details.plat{border-top-color:var(--line)}
       <button id="vList" aria-pressed="true">القائمة</button>
       <button id="vMonth" aria-pressed="false">الشهر</button>
     </div>
+    <button class="btn hidden" id="importBtn">استيراد Excel</button>
     <button class="btn hidden" id="exportBtn">تصدير Excel</button>
     <button class="btn primary hidden" id="addBtn">+ بوست جديد</button>
   </div>
@@ -357,7 +358,7 @@ async function start(session){
   if(S.started)return;S.started=true;
   $("#login").classList.add("hidden");
   S.canEdit=true;S.db=true;
-  $("#addBtn").classList.remove("hidden");$("#exportBtn").classList.remove("hidden");$("#signOut").classList.remove("hidden");
+  $("#addBtn").classList.remove("hidden");$("#importBtn").classList.remove("hidden");$("#exportBtn").classList.remove("hidden");$("#signOut").classList.remove("hidden");
   $("#roleLine").textContent=session.user.email;
   if(location.hash.includes("access_token"))history.replaceState(null,"",location.pathname);
   await loadPosts(true);
@@ -807,6 +808,144 @@ async function buildXlsx(posts,snapOnly){
   return {buf,name};
 }
 
+
+/* ---------- import a calendar Excel (same layout as the team's sheet) ---------- */
+const MON_IDX={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function cellText(v){
+  if(v==null)return "";
+  if(typeof v==="object"){
+    if(v.richText)return v.richText.map(r=>r.text).join("");
+    if(v.text!=null)return typeof v.text==="object"?cellText(v.text):String(v.text);
+    if(v.result!=null)return String(v.result);
+    if(v instanceof Date)return v.toISOString();
+  }
+  return String(v);
+}
+function cellLink(v){if(v&&typeof v==="object"&&v.hyperlink)return v.hyperlink;const t=cellText(v).trim();return /^https?:\/\//.test(t)?t:""}
+function cellTime(v){
+  if(v instanceof Date)return pad(v.getUTCHours())+":"+pad(v.getUTCMinutes());
+  if(typeof v==="number"){const m=Math.round((v%1)*1440);return pad(Math.floor(m/60))+":"+pad(m%60)}
+  const t=cellText(v).trim();const m=t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if(m){let h=+m[1];if(m[3]){h=h%12+(m[3].toUpperCase()==="PM"?12:0)}return pad(h)+":"+m[2]}
+  return "";
+}
+function clean(t){t=(t||"").trim();return /^(TBD|TBC|—|-)$/i.test(t)?"":t}
+async function parseCalendarXlsx(file){
+  await loadExcelJS();await loadJSZip();
+  const zip=await JSZip.loadAsync(await file.arrayBuffer());
+  const {imgs,sheetPath}=await extractImages(zip);
+  // ExcelJS can't read some drawing layouts, so load the cells without the drawing
+  if(sheetPath&&zip.file(sheetPath)){
+    const x=await zip.file(sheetPath).async("string");zip.file(sheetPath,x.replace(/<drawing\b[^>]*\/>/g,""));
+    const parts=sheetPath.split("/");const nm=parts.pop();const rp=parts.join("/")+"/_rels/"+nm+".rels";
+    if(zip.file(rp)){const r=await zip.file(rp).async("string");zip.file(rp,r.replace(/<Relationship\b[^>]*\/drawing"[^>]*\/>/g,""))}
+    Object.keys(zip.files).filter(f=>/^xl\/drawings\//.test(f)).forEach(f=>zip.remove(f));
+  }
+  const wb=new ExcelJS.Workbook();await wb.xlsx.load(await zip.generateAsync({type:"arraybuffer"}));
+  const ws=wb.worksheets[0];
+  let header=0,year=new Date().getFullYear();
+  ws.eachRow((row,r)=>{const a=cellText(row.getCell(1).value);const y=a.match(/(20\d\d)/);if(y&&r<4)year=+y[1];if(!header&&/^date$/i.test(a.trim())&&/time/i.test(cellText(row.getCell(2).value)))header=r});
+  if(!header)throw new Error("ما لقيت صف العناوين (Date / Time)");
+  const posts=[];let date=null,cur=null;
+  for(let r=header+1;r<=ws.rowCount;r++){
+    const row=ws.getRow(r);
+    const A=row.getCell(1),B=row.getCell(2);
+    if(!(A.isMerged&&A.master.address!==A.address)){
+      const t=cellText(A.value);const m=t.match(/(\d{1,2})\s*([A-Za-z]{3})/);
+      if(m&&MON_IDX[m[2].toLowerCase()]!=null)date=year+"-"+pad(MON_IDX[m[2].toLowerCase()]+1)+"-"+pad(+m[1]);
+    }
+    const bSlave=B.isMerged&&B.master.address!==B.address;
+    if(!bSlave&&B.value!=null&&cellText(B.value).trim()!==""&&date){
+      cur={date,time:cellTime(B.value),caption:clean(cellText(row.getCell(4).value)),design:cellLink(row.getCell(5).value),animation:cellLink(row.getCell(6).value),links:{},img:imgs[r]||null};
+      posts.push(cur);
+    }
+    if(cur){
+      const plat=cellText(row.getCell(7).value).trim();
+      const key=PLATS.map(x=>x[0]).find(k=>k.toLowerCase()===plat.toLowerCase());
+      if(key){const h=row.getCell(8).value;const urls=(cellLink(h)?[cellLink(h)]:[]).concat(cellText(h).split(/\s+/).filter(u=>/^https?:\/\//.test(u)));const u=[...new Set(urls)].join("\n");if(u)cur.links[key]=u}
+    }
+  }
+  return posts;
+}
+function loadJSZip(){
+  if(window.JSZip)return Promise.resolve();
+  return new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});
+}
+function resolvePath(base,target){if(target.startsWith("/"))return target.slice(1);const parts=base.split("/");parts.pop();for(const seg of target.split("/")){if(seg==="..")parts.pop();else if(seg!==".")parts.push(seg)}return parts.join("/")}
+async function relsOf(zip,path){
+  const parts=path.split("/");const name=parts.pop();const rp=parts.join("/")+"/_rels/"+name+".rels";
+  const f=zip.file(rp);if(!f)return {};
+  const doc=new DOMParser().parseFromString(await f.async("string"),"application/xml");
+  const out={};[...doc.getElementsByTagName("Relationship")].forEach(r=>out[r.getAttribute("Id")]={target:resolvePath(path,r.getAttribute("Target")),type:r.getAttribute("Type")||""});
+  return out;
+}
+async function extractImages(zip){
+  const wbDoc=new DOMParser().parseFromString(await zip.file("xl/workbook.xml").async("string"),"application/xml");
+  const firstSheet=wbDoc.getElementsByTagNameNS("*","sheet")[0];
+  const rid=firstSheet.getAttribute("r:id")||firstSheet.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
+  const wbRels=await relsOf(zip,"xl/workbook.xml");const sheetPath=wbRels[rid]?wbRels[rid].target:"xl/worksheets/sheet1.xml";
+  const imgs={};
+  const sRels=await relsOf(zip,sheetPath);
+  const dr=Object.values(sRels).find(r=>/\/drawing$/.test(r.type));
+  if(!dr||!zip.file(dr.target))return {imgs,sheetPath};
+  const dRels=await relsOf(zip,dr.target);
+  const doc=new DOMParser().parseFromString(await zip.file(dr.target).async("string"),"application/xml");
+  const anchors=[...doc.getElementsByTagNameNS("*","oneCellAnchor"),...doc.getElementsByTagNameNS("*","twoCellAnchor"),...doc.getElementsByTagNameNS("*","absoluteAnchor")];
+  for(const a of anchors){
+    const from=a.getElementsByTagNameNS("*","from")[0];if(!from)continue;
+    const row=+from.getElementsByTagNameNS("*","row")[0].textContent+1;
+    const blip=a.getElementsByTagNameNS("*","blip")[0];if(!blip)continue;
+    const emb=blip.getAttribute("r:embed")||blip.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","embed");
+    const rel=dRels[emb];if(!rel||!zip.file(rel.target))continue;
+    const ext=rel.target.split(".").pop().toLowerCase();
+    if(!imgs[row])imgs[row]={buffer:await zip.file(rel.target).async("uint8array"),extension:ext};
+  }
+  return {imgs,sheetPath};
+}
+function openImport(){
+  const root=$("#modalRoot");
+  root.innerHTML='<div class="overlay"><div class="modal" role="dialog" aria-modal="true" style="width:min(480px,100%)"><header><h2>استيراد كالندر من Excel</h2><button type="button" class="icon-btn" id="imX" aria-label="إغلاق">✕</button></header>'+
+   '<div class="content"><p style="margin:0" class="hint">ارفع ملف الكالندر بنفس تنسيق الشيت (Date، Time، Visual، Caption…). الصور والكابشن وروابط التصميم والمنصات كلها تنضاف.</p>'+
+   '<label class="btn" for="imFile" style="justify-self:start;cursor:pointer">اختر ملف Excel</label><input type="file" id="imFile" accept=".xlsx" class="hidden">'+
+   '<div id="imInfo" class="hint"></div></div>'+
+   '<footer><button class="btn primary" id="imGo" disabled>استورد</button><button class="btn" id="imNo">إلغاء</button><span class="msg" id="imMsg"></span></footer></div></div>';
+  const close=()=>root.innerHTML="";
+  $("#imX").onclick=close;$("#imNo").onclick=close;
+  let parsed=null;
+  $("#imFile").onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;
+    $("#imInfo").textContent="جاري قراءة الملف…";$("#imGo").disabled=true;
+    try{
+      parsed=await parseCalendarXlsx(f);
+      if(!parsed.length)throw new Error("ما لقيت بوستات في الملف");
+      const ds=parsed.map(p=>p.date).sort();
+      const dup=parsed.filter(p=>S.posts.some(x=>x.date===p.date&&x.time===p.time&&p.time)).length;
+      $("#imInfo").innerHTML="<b>"+esc(f.name)+"</b><br>"+parsed.length+" بوست من "+shortDate(ds[0])+" لين "+shortDate(ds[ds.length-1])+" · "+parsed.filter(p=>p.img).length+" صورة"+(dup?'<br><span style="color:var(--warn)">تنبيه: '+dup+' بوست لها نفس اليوم والوقت لبوستات موجودة، بتنضاف كنسخ جديدة.</span>':"");
+      $("#imGo").disabled=false;
+    }catch(err){$("#imInfo").textContent="ما قدرت أقرا الملف: "+(err.message||err)}
+  };
+  $("#imGo").onclick=async()=>{
+    $("#imGo").disabled=true;let i=0;
+    try{
+      for(const p of parsed){
+        i++;$("#imMsg").textContent="جاري الاستيراد "+i+" من "+parsed.length+"…";
+        const media=[];
+        if(p.img){
+          const ext=(p.img.extension||"png").replace("jpeg","jpg");
+          const path=p.date.slice(0,7)+"/"+crypto.randomUUID()+"."+ext;
+          const blob=new Blob([p.img.buffer],{type:ext==="jpg"?"image/jpeg":"image/"+ext});
+          const {error}=await sb.storage.from(BUCKET).upload(path,blob,{contentType:blob.type});
+          if(!error)media.push({path,type:"image"});
+        }
+        const row={date:p.date,time:p.time,caption:p.caption,media,design:p.design,animation:p.animation,links:p.links,landing:"",note:""};
+        const {error}=await sb.from("posts").insert(row);if(error)throw error;
+      }
+      close();toast("انضاف "+parsed.length+" بوست");
+      S.ym=parsed.map(p=>p.date).sort()[0].slice(0,7);await loadPosts(false);
+    }catch(err){$("#imGo").disabled=false;$("#imMsg").textContent="وقف عند "+i+": "+(err.message||err)}
+  };
+}
+
 /* ---------- controls ---------- */
 function shiftMonth(n){const [y,m]=S.ym.split("-").map(Number);const d=new Date(Date.UTC(y,m-1+n,1));S.ym=d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1);render();window.scrollTo(0,0)}
 $("#prevM").onclick=()=>shiftMonth(-1);
@@ -814,6 +953,7 @@ $("#nextM").onclick=()=>shiftMonth(1);
 $("#vList").onclick=()=>{S.view="list";render()};
 $("#vMonth").onclick=()=>{S.view="month";render()};
 $("#exportBtn").onclick=openExport;
+$("#importBtn").onclick=openImport;
 $("#addBtn").onclick=()=>openEditor(null,S.ym===todayISO.slice(0,7)?todayISO:S.ym+"-01");
 
 init();
