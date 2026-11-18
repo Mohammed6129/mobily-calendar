@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تقويم محتوى موبايلي</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="/config.js"></script>
+<style>
+/* Layout: sticky toolbar, then either an agenda of day rows (cards side by side) or a month grid. Editors get controls; everyone else just reads. */
+/* Apple-style light grey canvas with frosted-glass surfaces */
+:root{
+  --bg:#f5f5f7;
+  --surface:#ffffff;
+  --glass:rgba(255,255,255,.62);
+  --glass-strong:rgba(255,255,255,.8);
+  --glass-border:rgba(255,255,255,.75);
+  --ink:#1d1d1f;
+  --muted:#6e6e73;
+  --line:rgba(0,0,0,.08);
+  --accent:#0071e3;
+  --accent-2:#2997ff;
+  --accent-soft:rgba(0,113,227,.08);
+  --warn:#b25000;
+  --warn-soft:rgba(255,204,0,.22);
+  --danger:#e30000;
+  --today:#0071e3;
+  --shadow:0 1px 1px rgba(0,0,0,.03),0 8px 28px rgba(0,0,0,.06);
+  --blur:saturate(180%) blur(22px);
+  --f-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Arabic","IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif;
+  --f-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Arabic","IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+img,video{max-width:100%;display:block}
+.hidden{display:none!important}
+
+/* toolbar */
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1280px;margin:0 auto;padding:14px 20px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+.brand{display:flex;flex-direction:column;gap:0;margin-inline-end:auto}
+.brand h1{font-family:var(--f-display);font-size:20px;font-weight:700;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.brand small{color:var(--muted);font-size:13px}
+.month-nav{display:flex;align-items:center;gap:6px}
+.month-nav strong{font-family:var(--f-display);font-weight:600;font-size:16px;min-width:120px;text-align:center}
+.icon-btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;width:36px;height:36px;display:grid;place-items:center;font-size:16px}
+.icon-btn:hover{border-color:var(--accent)}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{border:0;background:none;padding:5px 14px;border-radius:7px;color:var(--muted);font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 14px;font-weight:500;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.danger{color:var(--danger)}
+.btn.danger.solid{background:var(--danger);border-color:var(--danger);color:#fff}
+
+.summary{max-width:1280px;margin:0 auto;padding:16px 20px 0;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px;display:flex;gap:8px;align-items:baseline}
+.stat b{font-family:var(--f-display);font-size:20px;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:13px}
+.stat.warn b{color:var(--warn)}
+.filter{margin-inline-start:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chk{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer}
+.chk input{accent-color:var(--accent)}
+
+main{max-width:1280px;margin:0 auto;padding:16px 20px 80px}
+.notice{background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:28px;text-align:center;color:var(--muted)}
+
+/* agenda */
+.day{display:grid;grid-template-columns:120px 1fr;gap:16px;padding:18px 0;border-top:1px solid var(--line);scroll-margin-top:90px}
+.day:first-child{border-top:0}
+.day-head{position:sticky;top:84px;align-self:start}
+.day-head .dn{color:var(--muted);font-size:13px}
+.day-head .dd{font-family:var(--f-display);font-weight:700;font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.day-head .dm{font-size:13px;color:var(--muted)}
+.day.today .dd{color:var(--today)}
+.day.today .dn::after{content:" · اليوم";color:var(--today);font-weight:600}
+.day-posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;min-height:60px;border-radius:14px;transition:background .15s}
+.day.drop .day-posts,.cell.drop{background:var(--accent-soft);outline:2px dashed var(--accent);outline-offset:4px}
+.day.empty{padding:8px 0}
+.day.empty .day-posts{min-height:40px}
+.day.empty .dd{font-size:22px}
+.day.empty .add-slot{min-height:40px}
+.add-slot{border:1.5px dashed var(--line);border-radius:14px;background:none;color:var(--muted);min-height:44px;font-weight:500}
+.add-slot:hover{border-color:var(--accent);color:var(--accent)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.card.dragging{opacity:.4}
+.card[draggable="true"]{cursor:grab}
+.media{position:relative;aspect-ratio:1/1;background:var(--accent-soft);cursor:zoom-in}
+.media img,.media video{width:100%;height:100%;object-fit:cover}
+.media .ph{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px;cursor:default}
+.media .count{position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;border-radius:999px;padding:1px 9px}
+.time{position:absolute;top:8px;right:8px;background:var(--surface);color:var(--ink);font-weight:600;font-size:13px;border-radius:999px;padding:2px 10px;font-variant-numeric:tabular-nums;box-shadow:var(--shadow)}
+.body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;flex:1}
+.badges{display:flex;gap:6px;flex-wrap:wrap}
+.card.notready{background:var(--warn-soft);border-color:var(--warn);box-shadow:0 0 0 1px var(--warn),var(--shadow)}
+.card.notready .tools{border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.card.notready details.plat{border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.nr{font-size:12px;font-weight:700;color:var(--warn);letter-spacing:.01em}
+.card.notready .badge{background:var(--surface);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent)}
+.badge{font-size:12px;border-radius:6px;padding:1px 8px;background:var(--warn-soft);color:var(--warn);font-weight:500}
+.cap{margin:0;white-space:pre-line;font-size:14px;overflow-wrap:anywhere}
+.cap.clamp{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.more{border:0;background:none;color:var(--accent);padding:0;font-size:13px;align-self:flex-start}
+.links{display:flex;gap:8px;flex-wrap:wrap}
+.lk{font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:2px 10px;color:var(--ink)}
+.lk:hover{border-color:var(--accent);color:var(--accent)}
+details.plat{border-top:1px solid var(--line);padding-top:8px;font-size:13px}
+details.plat summary{cursor:pointer;color:var(--muted)}
+.plat ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+.plat li{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.plat li span{font-weight:600;min-width:72px}
+.plat li a{direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:left;font-size:12px}
+.copy{border:1px solid var(--line);background:none;border-radius:6px;font-size:11px;padding:0 6px;color:var(--muted)}
+.tools{display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px;margin-top:auto}
+.tools button{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:3px 9px;font-size:12px;font-weight:500}
+.tools button:hover{border-color:var(--accent);color:var(--accent)}
+.tools .del:hover{border-color:var(--danger);color:var(--danger)}
+.tools .grow{margin-inline-start:auto}
+
+/* month grid */
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.wd{font-size:12px;color:var(--muted);text-align:center;padding:4px 0;font-weight:500}
+.cell{background:var(--surface);border:1px solid var(--line);border-radius:12px;min-height:118px;padding:6px;display:flex;flex-direction:column;gap:6px;cursor:pointer;transition:background .15s}
+.cell:hover{border-color:var(--accent)}
+.cell.out{background:transparent;border-style:dashed;cursor:default;opacity:.5}
+.cell.today{border-color:var(--today);box-shadow:inset 0 0 0 1px var(--today)}
+.cell .n{font-weight:600;font-variant-numeric:tabular-nums;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+.cell .n em{font-style:normal;font-size:11px;color:var(--muted);font-weight:500}
+.thumbs{display:grid;grid-template-columns:repeat(2,1fr);gap:4px}
+.thumbs .t{position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;background:var(--accent-soft)}
+.thumbs .t img,.thumbs .t video{width:100%;height:100%;object-fit:cover}
+.thumbs .t.miss{outline:2px solid var(--warn);outline-offset:-2px}
+.thumbs .t i{position:absolute;bottom:1px;right:3px;font-style:normal;font-size:10px;color:#fff;text-shadow:0 0 3px #000;font-weight:600}
+.thumbs .t[draggable="true"]{cursor:grab}
+@media (max-width:720px){
+  .cell{min-height:70px;padding:4px}
+  .thumbs{grid-template-columns:1fr}
+  .thumbs .t:nth-child(n+3){display:none}
+}
+@media (max-width:640px){
+  .day{grid-template-columns:1fr;gap:10px}
+  .day-head{position:static;display:flex;gap:8px;align-items:baseline}
+  .day-head .dd{font-size:22px}
+  .top-in{padding:12px 16px}
+  main,.summary{padding-inline:16px}
+}
+
+/* modal + lightbox */
+.overlay{position:fixed;inset:0;background:rgba(5,10,25,.6);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow:auto}
+.modal{background:var(--surface);border-radius:16px;width:min(680px,100%);box-shadow:0 20px 60px rgba(0,0,0,.35);display:flex;flex-direction:column}
+.modal header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+.modal h2{font-family:var(--f-display);font-size:18px;margin:0}
+.modal .content{padding:18px 20px;display:grid;gap:14px}
+.modal footer{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-start;align-items:center}
+.modal footer .msg{margin-inline-start:auto;font-size:13px;color:var(--muted)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:grid;gap:5px}
+.field label{font-size:13px;font-weight:600}
+.field input[type=text],.field input[type=url],.field input[type=date],.field input[type=time],.field textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px}
+.field textarea{min-height:150px;resize:vertical;line-height:1.7}
+.field input[type=url]{direction:ltr;text-align:left}
+.hint{font-size:12px;color:var(--muted)}
+.drop-zone{border:1.5px dashed var(--line);border-radius:12px;padding:14px;display:grid;gap:10px;background:var(--bg)}
+.drop-zone.over{border-color:var(--accent);background:var(--accent-soft)}
+.mlist{display:flex;gap:8px;flex-wrap:wrap}
+.mitem{position:relative;width:84px;height:84px;border-radius:8px;overflow:hidden;background:var(--accent-soft)}
+.mitem img,.mitem video{width:100%;height:100%;object-fit:cover}
+.mitem button{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-size:13px;line-height:1}
+.mitem .mv{position:absolute;bottom:3px;left:3px;right:3px;display:flex;justify-content:space-between}
+.mitem .mv button{position:static;width:20px;height:20px;font-size:11px}
+.pl summary{cursor:pointer;font-size:13px;font-weight:600}
+.pl .grid5{display:grid;gap:8px;margin-top:10px}
+.pl .grid5 div{display:grid;grid-template-columns:80px 1fr;gap:8px;align-items:center;font-size:13px}
+.pl .grid5 label{font-weight:500}
+.tp{display:grid;gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--bg)}
+.tp-row{display:grid;grid-template-columns:56px 1fr;gap:8px;align-items:center}
+.tp-l{font-size:12px;color:var(--muted)}
+.tp-g{display:flex;flex-wrap:wrap;gap:6px}
+.tp-g button{min-width:40px;height:34px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-weight:600;font-variant-numeric:tabular-nums;padding:0 10px}
+.tp-g button:hover{border-color:var(--accent)}
+.tp-g button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.tp-g.h{display:grid;grid-template-columns:repeat(4,52px)}
+.tp-g.h button{width:100%}
+.tp-g .tp-none{margin-inline-start:auto;font-weight:500;color:var(--muted)}
+.tp-g .tp-none[aria-pressed="true"]{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.pl input{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 8px;direction:ltr;text-align:left}
+.inline-chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+
+.lb{position:fixed;inset:0;z-index:60;background:rgba(4,8,20,.92);display:grid;grid-template-columns:1fr minmax(260px,380px);color:#eef1fa}
+.lb .stage{display:grid;place-items:center;padding:24px;position:relative;min-height:0}
+.lb .stage img,.lb .stage video{max-height:calc(100vh - 48px);max-width:100%;object-fit:contain;border-radius:8px}
+.lb aside{background:#10172c;padding:24px;overflow:auto;display:grid;align-content:start;gap:12px}
+.lb aside h3{margin:0;font-family:var(--f-display);font-size:16px}
+.lb aside p{margin:0;white-space:pre-line;font-size:14px;line-height:1.8}
+.lb .nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:20px}
+.lb .nav.prev{right:16px}.lb .nav.next{left:16px}
+.lb .x{position:absolute;top:14px;left:14px;width:38px;height:38px;border-radius:50%;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:18px;z-index:2}
+.lb .pos{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);font-size:13px;opacity:.8}
+@media (max-width:760px){.lb{grid-template-columns:1fr;grid-template-rows:60vh auto;overflow:auto}}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:10px;font-size:14px;z-index:80;box-shadow:var(--shadow)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* ---------- glass layer ---------- */
+body{background:var(--bg);-webkit-font-smoothing:antialiased;letter-spacing:-.003em}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(900px 600px at 85% -10%,rgba(0,113,227,.10),transparent 60%),
+             radial-gradient(700px 500px at 0% 30%,rgba(100,210,255,.10),transparent 60%),
+             radial-gradient(800px 600px at 60% 110%,rgba(175,82,222,.07),transparent 60%),var(--bg)}
+.top{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border-bottom:1px solid var(--line)}
+.card,.stat,.cell:not(.out),.btn,.icon-btn,.seg,.lk,.chk{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-border);box-shadow:var(--shadow)}
+.card{border-radius:20px}
+.cell{border-radius:16px}
+.stat{border-radius:14px}
+.btn,.icon-btn,.seg,.chk,.lk{border-radius:999px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.seg button{border-radius:999px}
+.btn.primary{background:var(--accent);border-color:transparent;color:#fff;box-shadow:0 4px 14px rgba(0,113,227,.28)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn:hover,.icon-btn:hover,.lk:hover{border-color:var(--glass-border);background:var(--glass-strong)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.media{background:rgba(0,0,0,.04)}
+.time{background:var(--glass-strong);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-border)}
+.tools button{background:rgba(255,255,255,.5);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.tools{border-top-color:var(--line)}
+details.plat{border-top-color:var(--line)}
+.add-slot{border-radius:20px;border-color:rgba(0,0,0,.12);background:rgba(255,255,255,.25)}
+.day{border-top-color:var(--line)}
+.overlay{background:rgba(0,0,0,.25);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.modal{background:var(--glass-strong);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-border);border-radius:22px}
+.modal header,.modal footer{border-color:var(--line)}
+.field input[type=text],.field input[type=url],.field input[type=date],.field textarea,.pl input{background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:12px}
+.drop-zone,.tp{background:rgba(255,255,255,.45);border-color:var(--line);border-radius:14px}
+.tp-g button{background:rgba(255,255,255,.8);border-color:var(--line);border-radius:10px}
+.tp-g button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.card.notready{background:linear-gradient(var(--warn-soft),var(--warn-soft)),var(--glass);border-color:rgba(255,179,0,.7);box-shadow:0 0 0 1px rgba(255,179,0,.5),var(--shadow)}
+.card.notready .badge{background:rgba(255,255,255,.75)}
+.toast{background:var(--glass-strong);color:var(--ink);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-border);border-radius:999px}
+@media (prefers-reduced-transparency: reduce){.card,.stat,.cell,.btn,.icon-btn,.seg,.top,.modal{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}}
+.login{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:20px}
+.login-card{width:min(400px,100%);background:var(--glass-strong);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-border);border-radius:24px;box-shadow:var(--shadow);padding:28px;display:grid;gap:14px}
+.login-card h2{margin:0;font-family:var(--f-display);font-size:22px}
+.login-card p{margin:0;color:var(--muted);font-size:14px}
+.login-card input{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.8);border-radius:12px;padding:10px 12px;direction:ltr;text-align:left}
+.login-card .btn{justify-content:center;padding:10px 14px}
+.who{display:flex;gap:8px;align-items:center}
+.who button{border:0;background:none;color:var(--accent);font-size:13px;padding:0}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="top-in">
+    <div class="brand">
+      <h1>تقويم محتوى موبايلي</h1>
+      <small class="who"><span id="roleLine">جاري التحميل…</span><button id="signOut" class="hidden" type="button">تسجيل خروج</button></small>
+    </div>
+    <div class="month-nav">
+      <button class="icon-btn" id="prevM" aria-label="الشهر السابق">›</button>
+      <strong id="monthLabel">—</strong>
+      <button class="icon-btn" id="nextM" aria-label="الشهر التالي">‹</button>
+    </div>
+    <div class="seg" role="group" aria-label="طريقة العرض">
+      <button id="vList" aria-pressed="true">القائمة</button>
+      <button id="vMonth" aria-pressed="false">الشهر</button>
+    </div>
+    <button class="btn hidden" id="exportBtn">تصدير Excel</button>
+    <button class="btn primary hidden" id="addBtn">+ بوست جديد</button>
+  </div>
+</div>
+
+<div class="summary" id="summary"></div>
+<main id="main"><div class="notice">جاري تحميل البوستات…</div></main>
+
+<div class="login hidden" id="login"><form class="login-card" id="loginForm">
+  <h2>تقويم محتوى موبايلي</h2>
+  <p>اكتب إيميلك ونرسل لك رابط الدخول.</p>
+  <input type="email" id="loginEmail" required placeholder="name@example.com" autocomplete="email">
+  <button class="btn primary" type="submit" id="loginBtn">أرسل رابط الدخول</button>
+  <p id="loginMsg" aria-live="polite"></p>
+</form></div>
+<div id="modalRoot"></div>
+<div id="lbRoot"></div>
+
+<script>
+(function(){
+"use strict";
+const DAYS=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+const MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+const PLATS=[["X","X"],["Instagram","Instagram"],["Facebook","Facebook"],["TikTok","TikTok"],["Snapchat","Snapchat"]];
+
+const S={posts:[],ym:null,view:"list",canEdit:false,db:null,onlyMissing:false,showEmpty:false,loaded:false,dragId:null,urls:{}};
+const sb=window.supabase.createClient(window.MC_CONFIG.url,window.MC_CONFIG.anonKey);
+const BUCKET="media";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad=n=>String(n).padStart(2,"0");
+const todayISO=(()=>{const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())})();
+function parseISO(s){const [y,m,d]=s.split("-").map(Number);return new Date(Date.UTC(y,m-1,d))}
+function iso(dt){return dt.getUTCFullYear()+"-"+pad(dt.getUTCMonth()+1)+"-"+pad(dt.getUTCDate())}
+function addDays(s,n){const d=parseISO(s);d.setUTCDate(d.getUTCDate()+n);return iso(d)}
+function shortDate(s){const d=parseISO(s);return d.getUTCDate()+" "+MONTHS[d.getUTCMonth()]}
+function dayName(s){return DAYS[parseISO(s).getUTCDay()]}
+function fmtTime(t){if(!t)return "الوقت لم يحدد";const [h,m]=t.split(":").map(Number);const ap=h<12?"ص":"م";const hh=((h+11)%12)+1;return hh+":"+pad(m)+" "+ap}
+function mediaUrl(m){return (m&&S.urls[m.path])||""}
+async function signPaths(paths){
+  const need=[...new Set(paths)].filter(p=>p&&!S.urls[p]);
+  if(!need.length)return;
+  const {data,error}=await sb.storage.from(BUCKET).createSignedUrls(need,60*60*12);
+  if(!error&&data)data.forEach(d=>{if(d.signedUrl)S.urls[d.path]=d.signedUrl});
+}
+function isVideo(m){return m&&m.type==="video"}
+function missing(p){
+  const out=[];
+  if(!(p.media&&p.media.length))out.push("بدون صورة");
+  if(!p.design||!String(p.design).trim())out.push("بدون ملفات تصميم");
+  if(!p.caption||!p.caption.trim())out.push("بدون كابشن");
+  if(!p.time)out.push("بدون وقت");
+  const have=PLATS.filter(([k])=>p.links&&String(p.links[k]||"").trim()).length;
+  if(p.landing&&have<PLATS.length)out.push("بانتظار الاختصار");
+  else if(!have)out.push("بدون روابط");
+  return out;
+}
+function toast(msg){const t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
+function sortPosts(a,b){return (a.time||"99")<(b.time||"99")?-1:(a.time||"99")>(b.time||"99")?1:0}
+
+/* ---------- data ---------- */
+async function init(){
+  S.ym=todayISO.slice(0,7);
+  render();
+  $("#loginForm").onsubmit=async e=>{
+    e.preventDefault();
+    const email=$("#loginEmail").value.trim().toLowerCase();
+    $("#loginBtn").disabled=true;$("#loginMsg").textContent="جاري الإرسال…";
+    const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.origin}});
+    $("#loginBtn").disabled=false;
+    if(error){$("#loginMsg").textContent=/signup|not allowed|not found/i.test(error.message)?"هذا الإيميل ما له صلاحية دخول.":/rate|seconds/i.test(error.message)?"انتظر شوي وجرّب مرة ثانية.":"ما انرسل الرابط: "+error.message}
+    else $("#loginMsg").textContent="أرسلنا لك رابط الدخول. افتح إيميلك واضغط عليه من نفس الجهاز.";
+  };
+  $("#signOut").onclick=async()=>{await sb.auth.signOut();location.reload()};
+  const {data:{session}}=await sb.auth.getSession();
+  sb.auth.onAuthStateChange((ev,sess)=>{if(ev==="SIGNED_IN"&&!S.started)start(sess);if(ev==="SIGNED_OUT")location.reload()});
+  if(session)start(session);
+  else{$("#login").classList.remove("hidden");$("#main").innerHTML="";$("#roleLine").textContent="سجّل دخولك"}
+}
+async function start(session){
+  if(S.started)return;S.started=true;
+  $("#login").classList.add("hidden");
+  S.canEdit=true;S.db=true;
+  $("#addBtn").classList.remove("hidden");$("#exportBtn").classList.remove("hidden");$("#signOut").classList.remove("hidden");
+  $("#roleLine").textContent=session.user.email;
+  if(location.hash.includes("access_token"))history.replaceState(null,"",location.pathname);
+  await loadPosts(true);
+  let t=null;
+  sb.channel("posts-live").on("postgres_changes",{event:"*",schema:"public",table:"posts"},()=>{clearTimeout(t);t=setTimeout(()=>loadPosts(false),250)}).subscribe();
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)loadPosts(false)});
+}
+async function loadPosts(first){
+  const timer=first?setTimeout(()=>{if(!S.loaded)$("#main").innerHTML='<div class="notice">التحميل طوّل شوي… تأكد من الاتصال.</div>'},10000):null;
+  const {data,error}=await sb.from("posts").select("*");
+  if(timer)clearTimeout(timer);
+  if(error){$("#main").innerHTML='<div class="notice">صار خطأ في تحميل المحتوى. حدّث الصفحة.</div>';return}
+  S.posts=data||[];
+  await signPaths(S.posts.flatMap(p=>(p.media||[]).map(m=>m.path)));
+  S.loaded=true;
+  if(first&&S.posts.length){
+    const months=new Set(S.posts.map(p=>p.date&&p.date.slice(0,7)));
+    if(!months.has(S.ym)){const up=S.posts.map(p=>p.date).filter(Boolean).sort();S.ym=(up.find(d=>d>=todayISO)||up[up.length-1]).slice(0,7)}
+  }
+  if(first&&S.view==="list"&&S.ym===todayISO.slice(0,7))S.pendingScroll=todayISO;
+  render();
+}
+async function movePost(id,newDate){
+  const p=S.posts.find(x=>x.id===id);if(!p||p.date===newDate)return;
+  try{const {error}=await sb.from("posts").update({date:newDate,updated_at:new Date().toISOString()}).eq("id",id);if(error)throw error;p.date=newDate;render();toast("انتقل البوست إلى "+dayName(newDate)+" "+shortDate(newDate))}
+  catch(e){toast("ما انحفظ النقل، جرّب مرة ثانية")}
+}
+async function deletePost(id){
+  try{const {error}=await sb.from("posts").delete().eq("id",id);if(error)throw error;S.posts=S.posts.filter(x=>x.id!==id);render();toast("انحذف البوست")}catch(e){toast("ما انحذف، جرّب مرة ثانية")}
+}
+
+/* ---------- render ---------- */
+function monthPosts(){return S.posts.filter(p=>p.date&&p.date.startsWith(S.ym))}
+function render(){
+  const [y,m]=S.ym.split("-").map(Number);
+  $("#monthLabel").textContent=MONTHS[m-1]+" "+y;
+  $("#vList").setAttribute("aria-pressed",S.view==="list");
+  $("#vMonth").setAttribute("aria-pressed",S.view==="month");
+  const mp=monthPosts();
+  $("#summary").innerHTML=
+    '<div class="stat"><b>'+mp.length+'</b><span>بوست هالشهر</span></div>'+
+    '';
+  if(!S.loaded)return;
+  if(S.view==="list")renderList(mp);else renderMonth(mp);
+}
+
+function daysInMonth(){const [y,m]=S.ym.split("-").map(Number);return new Date(Date.UTC(y,m,0)).getUTCDate()}
+
+function renderList(mp){
+  const main=$("#main");main.innerHTML="";
+  const n=daysInMonth();let shown=0;
+  const wrap=document.createElement("div");
+  for(let d=1;d<=n;d++){
+    const ds=S.ym+"-"+pad(d);
+    let ps=mp.filter(p=>p.date===ds).sort(sortPosts);
+    if(S.onlyMissing)ps=ps.filter(p=>missing(p).length);
+    if(!ps.length&&!S.canEdit)continue;
+    shown++;
+    const sec=document.createElement("section");
+    sec.className="day"+(ds===todayISO?" today":"")+(ps.length?"":" empty");
+    sec.id="d-"+ds;
+    sec.innerHTML='<div class="day-head"><div class="dn">'+dayName(ds)+'</div><div class="dd">'+d+'</div><div class="dm">'+MONTHS[parseISO(ds).getUTCMonth()]+'</div></div><div class="day-posts"></div>';
+    const box=sec.querySelector(".day-posts");
+    ps.forEach(p=>box.appendChild(card(p)));
+    if(S.canEdit){
+      const add=document.createElement("button");add.className="add-slot";add.textContent="+ أضف بوست ل"+dayName(ds)+" "+d;
+      add.onclick=()=>openEditor(null,ds);box.appendChild(add);
+      makeDrop(sec,ds);
+    }
+    wrap.appendChild(sec);
+  }
+  if(!shown){
+    main.innerHTML='<div class="notice">'+(S.onlyMissing?'كل بوستات الشهر مكتملة.':'ما فيه بوستات في هالشهر.'+'')+'</div>';
+    return;
+  }
+  main.appendChild(wrap);
+  if(S.pendingScroll){const el=document.getElementById("d-"+S.pendingScroll);S.pendingScroll=null;if(el)el.scrollIntoView({block:"start"})}
+}
+
+function card(p){
+  const el=document.createElement("article");el.dataset.id=p.id;
+  const media=p.media||[];const ms=missing(p);
+  el.className="card"+(ms.length?" notready":"");
+  const first=media[0];
+  let mHtml='<div class="media">';
+  if(first){mHtml+=isVideo(first)?'<video src="'+mediaUrl(first)+'" muted playsinline preload="metadata"></video>':'<img loading="lazy" alt="تصميم البوست" src="'+mediaUrl(first)+'">';
+    if(media.length>1)mHtml+='<span class="count">'+media.length+' صور</span>';}
+  else mHtml+='<div class="ph">التصميم لسا ما نزل</div>';
+  mHtml+='<span class="time">'+esc(fmtTime(p.time))+'</span></div>';
+  const links=[];
+  if(p.design)links.push('<a class="lk" href="'+esc(p.design)+'" target="_blank" rel="noopener">ملفات التصميم ↗</a>');
+  if(p.landing)links.push('<a class="lk" href="'+esc(p.landing)+'" target="_blank" rel="noopener">الرابط الأصلي ↗</a>');
+  if(p.animation)links.push('<a class="lk" href="'+esc(p.animation)+'" target="_blank" rel="noopener">الأنيميشن ↗</a>');
+  const pl=PLATS.filter(([k])=>p.links&&p.links[k]);
+  let body='<div class="body">';
+  if(ms.length)body+='<div class="nr">مو جاهز للنشر</div><div class="badges">'+ms.map(b=>'<span class="badge">'+b+'</span>').join("")+'</div>';
+  if(p.caption&&p.caption.trim())body+='<p class="cap clamp">'+esc(p.caption.trim())+'</p><button class="more hidden">اقرأ الكابشن كامل</button>';
+  if(p.note&&p.note.trim())body+='<p class="cap hint">ملاحظة: '+esc(p.note)+'</p>';
+  if(links.length)body+='<div class="links">'+links.join("")+'</div>';
+  if(pl.length)body+='<details class="plat"><summary>روابط المنصات ('+pl.length+')</summary><ul>'+pl.map(([k,l])=>String(p.links[k]).split(/\s+/).filter(Boolean).map(u=>'<li><span>'+l+'</span><a href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(u.replace(/^https?:\/\//,""))+'</a><button class="copy" data-copy="'+esc(u)+'">نسخ</button></li>').join("")).join("")+'</ul></details>';
+  if(S.canEdit){
+    const prev=addDays(p.date,-1),next=addDays(p.date,1);
+    body+='<div class="tools">'+
+      '<button data-a="up" title="انقله لليوم اللي قبل">▲ '+shortDate(prev)+'</button>'+
+      '<button data-a="down" title="انقله لليوم اللي بعد">▼ '+shortDate(next)+'</button>'+
+      '<button data-a="edit" class="grow">تعديل</button>'+
+      '<button data-a="dup">تكرار</button>'+
+      '<button data-a="del" class="del">حذف</button></div>';
+  }
+  body+='</div>';
+  el.innerHTML=mHtml+body;
+  const cap=el.querySelector(".cap.clamp"),more=el.querySelector(".more");
+  if(cap&&more){requestAnimationFrame(()=>{if(cap.scrollHeight>cap.clientHeight+2)more.classList.remove("hidden")});
+    more.onclick=()=>{const c=cap.classList.toggle("clamp");more.textContent=c?"اقرأ الكابشن كامل":"أخفِ";}}
+  if(first)el.querySelector(".media").onclick=()=>openLightbox(p,0);
+  el.querySelectorAll(".copy").forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.copy);toast("انسخ الرابط")}catch(e){toast("ما قدرت أنسخ، انسخه يدوي")}});
+  if(S.canEdit){
+    el.querySelector('[data-a="up"]').onclick=()=>movePost(p.id,addDays(p.date,-1));
+    el.querySelector('[data-a="down"]').onclick=()=>movePost(p.id,addDays(p.date,1));
+    el.querySelector('[data-a="edit"]').onclick=()=>openEditor(p);
+    el.querySelector('[data-a="dup"]').onclick=()=>openEditor(Object.assign({},p,{id:null}),null,true);
+    el.querySelector('[data-a="del"]').onclick=()=>confirmDelete(p);
+    el.draggable=true;
+    el.addEventListener("dragstart",e=>{S.dragId=p.id;el.classList.add("dragging");e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",p.id)}catch(_){}} );
+    el.addEventListener("dragend",()=>{S.dragId=null;el.classList.remove("dragging")});
+  }
+  return el;
+}
+
+function makeDrop(el,ds){
+  el.addEventListener("dragover",e=>{if(!S.dragId)return;e.preventDefault();el.classList.add("drop")});
+  el.addEventListener("dragleave",e=>{if(!el.contains(e.relatedTarget))el.classList.remove("drop")});
+  el.addEventListener("drop",e=>{e.preventDefault();el.classList.remove("drop");const id=S.dragId;S.dragId=null;if(id)movePost(id,ds)});
+}
+
+function renderMonth(mp){
+  const main=$("#main");main.innerHTML="";
+  const g=document.createElement("div");g.className="grid";
+  DAYS.forEach(d=>{const w=document.createElement("div");w.className="wd";w.textContent=d;g.appendChild(w)});
+  const first=parseISO(S.ym+"-01");const lead=first.getUTCDay();const n=daysInMonth();
+  for(let i=0;i<lead;i++){const c=document.createElement("div");c.className="cell out";g.appendChild(c)}
+  for(let d=1;d<=n;d++){
+    const ds=S.ym+"-"+pad(d);
+    let ps=mp.filter(p=>p.date===ds).sort(sortPosts);
+    if(S.onlyMissing)ps=ps.filter(p=>missing(p).length);
+    const c=document.createElement("div");c.className="cell"+(ds===todayISO?" today":"");c.tabIndex=0;
+    c.setAttribute("role","button");c.setAttribute("aria-label",dayName(ds)+" "+d);
+    c.innerHTML='<div class="n"><span>'+d+'</span>'+'</div><div class="thumbs"></div>';
+    const th=c.querySelector(".thumbs");
+    ps.slice(0,4).forEach(p=>{
+      const t=document.createElement("div");t.className="t"+(missing(p).length?" miss":"");t.title=fmtTime(p.time);
+      const m=(p.media||[])[0];
+      t.innerHTML=(m?(isVideo(m)?'<video src="'+mediaUrl(m)+'" muted preload="metadata"></video>':'<img loading="lazy" alt="" src="'+mediaUrl(m)+'">'):'')+'<i>'+esc(p.time||"؟")+'</i>';
+      if(S.canEdit){t.draggable=true;
+        t.addEventListener("dragstart",e=>{e.stopPropagation();S.dragId=p.id;try{e.dataTransfer.setData("text/plain",p.id)}catch(_){}});
+        t.addEventListener("dragend",()=>{S.dragId=null});}
+      th.appendChild(t);
+    });
+    if(ps.length>4){const more=document.createElement("div");more.className="t";more.innerHTML='<i style="position:static;display:grid;place-items:center;height:100%;color:var(--muted);text-shadow:none">+'+(ps.length-4)+'</i>';th.appendChild(more)}
+    const go=()=>{S.view="list";S.pendingScroll=ds;if(!ps.length&&S.canEdit)S.showEmpty=true;render()};
+    c.onclick=go;c.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}};
+    if(S.canEdit)makeDrop(c,ds);
+    g.appendChild(c);
+  }
+  main.appendChild(g);
+}
+
+/* ---------- lightbox ---------- */
+function openLightbox(p,i){
+  const media=p.media||[];if(!media.length)return;
+  const root=$("#lbRoot");
+  const draw=()=>{
+    const m=media[i];
+    root.innerHTML='<div class="lb" role="dialog" aria-modal="true" aria-label="معاينة البوست"><div class="stage">'+
+      '<button class="x" aria-label="إغلاق">✕</button>'+
+      (isVideo(m)?'<video src="'+mediaUrl(m)+'" controls autoplay playsinline></video>':'<img alt="تصميم البوست" src="'+mediaUrl(m)+'">')+
+      (media.length>1?'<button class="nav prev" aria-label="السابق">›</button><button class="nav next" aria-label="التالي">‹</button><span class="pos">'+(i+1)+' / '+media.length+'</span>':'')+
+      '</div><aside><h3>'+dayName(p.date)+' '+shortDate(p.date)+' · '+esc(fmtTime(p.time))+'</h3><p>'+esc(p.caption||"الكابشن لسا ما نزل")+'</p></aside></div>';
+    root.querySelector(".x").onclick=close;
+    root.querySelector(".lb").onclick=e=>{if(e.target.classList.contains("stage"))close()};
+    const pv=root.querySelector(".prev"),nx=root.querySelector(".next");
+    if(pv)pv.onclick=()=>{i=(i-1+media.length)%media.length;draw()};
+    if(nx)nx.onclick=()=>{i=(i+1)%media.length;draw()};
+    root.querySelector(".x").focus();
+  };
+  const key=e=>{if(e.key==="Escape")close();if(media.length>1&&e.key==="ArrowLeft"){i=(i+1)%media.length;draw()}if(media.length>1&&e.key==="ArrowRight"){i=(i-1+media.length)%media.length;draw()}};
+  function close(){root.innerHTML="";document.removeEventListener("keydown",key)}
+  document.addEventListener("keydown",key);draw();
+}
+
+/* ---------- delete confirm ---------- */
+function confirmDelete(p){
+  const root=$("#modalRoot");
+  root.innerHTML='<div class="overlay"><div class="modal" role="dialog" aria-modal="true" style="width:min(420px,100%)"><header><h2>تحذف البوست؟</h2></header><div class="content"><p style="margin:0">بوست '+dayName(p.date)+' '+shortDate(p.date)+' الساعة '+esc(fmtTime(p.time))+' بينحذف من التقويم نهائيًا.</p></div><footer><button class="btn danger solid" id="cDel">احذف</button><button class="btn" id="cNo">إلغاء</button></footer></div></div>';
+  const close=()=>root.innerHTML="";
+  $("#cNo").onclick=close;$("#cNo").focus();
+  $("#cDel").onclick=async()=>{close();await deletePost(p.id)};
+  root.querySelector(".overlay").onclick=e=>{if(e.target.classList.contains("overlay"))close()};
+}
+
+/* ---------- editor ---------- */
+function openEditor(p,dateForNew,isDup){
+  const isNew=!p||!p.id;
+  const st={media:(p&&p.media?p.media.slice():[]),uploading:0};
+  const root=$("#modalRoot");
+  const v=p||{};
+  root.innerHTML='<div class="overlay"><form class="modal" role="dialog" aria-modal="true" id="ed">'+
+   '<header><h2>'+(isDup?'تكرار بوست':isNew?'بوست جديد':'تعديل البوست')+'</h2><button type="button" class="icon-btn" id="edX" aria-label="إغلاق">✕</button></header>'+
+   '<div class="content">'+
+    '<div class="field" style="max-width:260px"><label for="fDate">التاريخ</label><input type="date" id="fDate" required value="'+esc(v.date||dateForNew||todayISO)+'"></div>'+
+    '<div class="field"><label>الوقت <span class="hint" id="tLabel"></span></label><div class="tp" id="tp">'+
+      '<div class="tp-row"><span class="tp-l">الساعة</span><div class="tp-g h">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(h=>'<button type="button" data-h="'+h+'">'+h+'</button>').join("")+'</div></div>'+
+      '<div class="tp-row"><span class="tp-l">الدقيقة</span><div class="tp-g m">'+["00","15","30","45"].map(m=>'<button type="button" data-m="'+m+'">'+m+'</button>').join("")+'</div></div>'+
+      '<div class="tp-row"><span class="tp-l">الفترة</span><div class="tp-g a"><button type="button" data-a="am">صباحًا</button><button type="button" data-a="pm">مساءً</button><button type="button" data-a="none" class="tp-none">بدون وقت</button></div></div>'+
+    '</div></div>'+
+    '<div class="field"><label>التصميم</label><div class="drop-zone" id="dz"><div class="mlist" id="mlist"></div>'+
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label class="btn" for="fFile" style="cursor:pointer">ارفع صور أو فيديو</label><input type="file" id="fFile" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" multiple class="hidden">'+
+      '<span class="hint">أو اسحبها هنا، أو الصق صورة بـ Ctrl+V</span></div><span class="hint" id="upMsg"></span></div></div>'+
+    '<div class="field"><label for="fCap">الكابشن</label><textarea id="fCap" placeholder="الصق الكابشن هنا">'+esc(v.caption||"")+'</textarea></div>'+
+    '<div class="row2"><div class="field"><label for="fDesign">رابط ملفات التصميم</label><input type="url" id="fDesign" placeholder="https://drive.google.com/…" value="'+esc(v.design||"")+'"></div>'+
+    '<div class="field"><label for="fAnim">رابط الأنيميشن</label><input type="url" id="fAnim" placeholder="https://…" value="'+esc(v.animation||"")+'"></div></div>'+
+    '<div class="field"><label for="fLanding">ضع الرابط الأصلي في حال لا يوجد اختصار</label><input type="url" id="fLanding" placeholder="https://www.mobily.com.sa/…" value="'+esc(v.landing||"")+'"><span class="hint" id="landHint">يصير البوست «بانتظار الاختصار» لين تنضاف الروابط المختصرة. هذا الرابط ما يطلع في ملف الإكسل.</span></div>'+
+    '<details class="field pl"><summary>روابط المنصات المختصرة</summary><div class="grid5">'+
+      PLATS.map(([k,l])=>'<div><label for="fL_'+k+'">'+l+'</label><input type="text" dir="ltr" id="fL_'+k+'" placeholder="https://mobily.im/… (أكثر من رابط؟ افصل بمسافة)" value="'+esc(((v.links&&v.links[k])||"").replace(/\s+/g," "))+'"></div>').join("")+
+    '</div></details>'+
+    '<div class="field"><label for="fNote">ملاحظة (تطلع للكل)</label><input type="text" id="fNote" value="'+esc(v.note||"")+'" placeholder="مثلًا: بانتظار موافقة العميل على السعر"></div>'+
+   '</div>'+
+   '<footer><button type="submit" class="btn primary" id="edSave">'+(isNew?'أضف للتقويم':'احفظ التعديل')+'</button><button type="button" class="btn" id="edCancel">إلغاء</button><span class="msg" id="edMsg"></span></footer>'+
+  '</form></div>';
+  const close=()=>{document.removeEventListener("paste",onPaste);document.removeEventListener("keydown",onKey);root.innerHTML=""};
+  const onKey=e=>{if(e.key==="Escape")close()};
+  $("#edX").onclick=close;$("#edCancel").onclick=close;
+  document.addEventListener("keydown",onKey);
+
+  // time picker: hour boxes + fixed quarter-hour minutes + AM/PM
+  const ts={h:null,m:"00",a:"pm",none:true};
+  if(v.time){const [hh,mm]=v.time.split(":").map(Number);ts.none=false;ts.a=hh<12?"am":"pm";ts.h=((hh+11)%12)+1;ts.m=pad((Math.round(mm/15)*15)%60)}
+  function tVal(){if(ts.none||ts.h==null)return "";let h=ts.h%12;if(ts.a==="pm")h+=12;return pad(h)+":"+ts.m}
+  function drawTime(){
+    document.querySelectorAll("#tp [data-h]").forEach(b=>b.setAttribute("aria-pressed",!ts.none&&Number(b.dataset.h)===ts.h));
+    document.querySelectorAll("#tp [data-m]").forEach(b=>b.setAttribute("aria-pressed",!ts.none&&b.dataset.m===ts.m));
+    document.querySelectorAll("#tp [data-a]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.a==="none"?ts.none:(!ts.none&&b.dataset.a===ts.a)));
+    $("#tLabel").textContent=tVal()?"· "+fmtTime(tVal()):"· لم يحدد";
+  }
+  document.querySelectorAll("#tp [data-h]").forEach(b=>b.onclick=()=>{ts.h=Number(b.dataset.h);ts.none=false;drawTime()});
+  document.querySelectorAll("#tp [data-m]").forEach(b=>b.onclick=()=>{ts.m=b.dataset.m;ts.none=false;if(ts.h==null)ts.h=12;drawTime()});
+  document.querySelectorAll("#tp [data-a]").forEach(b=>b.onclick=()=>{if(b.dataset.a==="none"){ts.none=true}else{ts.a=b.dataset.a;ts.none=false;if(ts.h==null)ts.h=12}drawTime()});
+  drawTime();
+
+  const drawMedia=()=>{
+    const ml=$("#mlist");ml.innerHTML="";
+    st.media.forEach((m,i)=>{
+      const it=document.createElement("div");it.className="mitem";
+      it.innerHTML=(isVideo(m)?'<video src="'+mediaUrl(m)+'" muted></video>':'<img alt="" src="'+mediaUrl(m)+'">')+'<button type="button" aria-label="شيل">✕</button>'+
+        (st.media.length>1?'<div class="mv"><button type="button" data-d="1" aria-label="قدّم">›</button><button type="button" data-d="-1" aria-label="أخّر">‹</button></div>':'');
+      it.querySelector("button").onclick=()=>{st.media.splice(i,1);drawMedia()};
+      it.querySelectorAll(".mv button").forEach(b=>b.onclick=()=>{const k=b.dataset.d==="1"?i-1:i+1;if(k<0||k>=st.media.length)return;[st.media[i],st.media[k]]=[st.media[k],st.media[i]];drawMedia()});
+      ml.appendChild(it);
+    });
+    $("#upMsg").textContent=st.uploading?"جاري رفع "+st.uploading+"…":"";
+  };
+  drawMedia();
+
+  async function upload(files){
+    files=[...files].filter(f=>/^(image|video)\//.test(f.type));
+    if(!files.length)return;
+    for(const f of files){
+      st.uploading++;drawMedia();
+      try{
+        if(f.size>50*1024*1024){const er=new Error("big");er.code="too_large";throw er}
+        const ext=((f.name||"").split(".").pop()||f.type.split("/")[1]||"bin").toLowerCase().replace(/[^a-z0-9]/g,"");
+        const path=new Date().toISOString().slice(0,7)+"/"+crypto.randomUUID()+"."+ext;
+        const {error}=await sb.storage.from(BUCKET).upload(path,f,{contentType:f.type});
+        if(error)throw error;
+        await signPaths([path]);
+        st.media.push({path,type:f.type.startsWith("video")?"video":"image"});
+      }catch(e){
+        const c=e&&e.code;
+        toast(c==="too_large"?"الملف أكبر من 50 ميجا":c==="unsupported_type"?"نوع الملف غير مدعوم":"ما انرفع "+(f.name||"الملف")+"، جرّب مرة ثانية");
+      }
+      st.uploading--;drawMedia();
+    }
+  }
+  $("#fFile").onchange=e=>{upload(e.target.files);e.target.value=""};
+  const dz=$("#dz");
+  dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("over")});
+  dz.addEventListener("dragleave",()=>dz.classList.remove("over"));
+  dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("over");upload(e.dataTransfer.files)});
+  function onPaste(e){const fs=[...(e.clipboardData&&e.clipboardData.files||[])];if(fs.length){e.preventDefault();upload(fs)}}
+  document.addEventListener("paste",onPaste);
+
+  $("#ed").onsubmit=async e=>{
+    e.preventDefault();
+    if(st.uploading){$("#edMsg").textContent="استنى يخلص الرفع";return}
+    const links={};PLATS.forEach(([k])=>{const val=$("#fL_"+k).value.trim();if(val)links[k]=val});
+    const data={
+      date:$("#fDate").value,time:tVal(),caption:$("#fCap").value,
+      media:st.media,design:$("#fDesign").value.trim(),animation:$("#fAnim").value.trim(),
+      links,landing:$("#fLanding").value.trim(),note:$("#fNote").value.trim(),updated_at:new Date().toISOString()
+    };
+    if(!data.date){$("#edMsg").textContent="حدد التاريخ";return}
+    $("#edSave").disabled=true;$("#edMsg").textContent="جاري الحفظ…";
+    try{
+      const res=isNew?await sb.from("posts").insert(data):await sb.from("posts").update(data).eq("id",p.id);
+      if(res.error)throw res.error;
+      await loadPosts(false);
+      close();toast(isNew?"انضاف البوست":"انحفظ التعديل");
+      if(!data.date.startsWith(S.ym)){S.ym=data.date.slice(0,7);render()}
+    }catch(err){
+      $("#edSave").disabled=false;
+      $("#edMsg").textContent="ما انحفظ، جرّب مرة ثانية"+(err&&err.message?" ("+err.message+")":"");
+    }
+  };
+  setTimeout(()=>$("#fCap").focus(),30);
+}
+
+/* ---------- export to Excel (same layout as the team's calendar sheet) ---------- */
+const EN_DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const EN_MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const PLAT_COLOR={X:"FF000000",Instagram:"FFC13584",Facebook:"FF1877F2",TikTok:"FF007D83",Snapchat:"FF9C7300"};
+function loadExcelJS(){
+  if(window.ExcelJS)return Promise.resolve();
+  return new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});
+}
+async function imageJpeg(id){
+  const url=S.urls[id]||(await signPaths([id]),S.urls[id]);const r=await fetch(url);if(!r.ok)throw new Error("img");
+  const bmp=await createImageBitmap(await r.blob());
+  const k=Math.min(1,600/Math.max(bmp.width,bmp.height));
+  const c=document.createElement("canvas");c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);
+  const g=c.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,c.width,c.height);g.drawImage(bmp,0,0,c.width,c.height);
+  const b64=c.toDataURL("image/jpeg",0.88).split(",")[1];
+  return {b64,w:c.width,h:c.height};
+}
+function openExport(){
+  const mp=monthPosts();
+  const root=$("#modalRoot");
+  const [y,m]=S.ym.split("-").map(Number);
+  root.innerHTML='<div class="overlay"><div class="modal" role="dialog" aria-modal="true" style="width:min(460px,100%)"><header><h2>تصدير '+MONTHS[m-1]+' '+y+' إلى Excel</h2><button type="button" class="icon-btn" id="exX" aria-label="إغلاق">✕</button></header>'+
+   '<div class="content"><p style="margin:0" class="hint">'+mp.length+' بوست، بنفس تنسيق شيت الكالندر: الصور والكابشن وروابط التصميم والأنيميشن.</p>'+
+   '<div class="tp-g ex" role="radiogroup" style="display:grid;gap:8px">'+
+     '<label class="chk" style="border-radius:10px;padding:10px 12px"><input type="radio" name="exMode" value="all" checked> كل روابط المنصات (X، Instagram، Facebook، TikTok، Snapchat)</label>'+
+     '<label class="chk" style="border-radius:10px;padding:10px 12px"><input type="radio" name="exMode" value="snap"> رابط سناب شات فقط</label>'+
+   '</div></div>'+
+   '<footer><button class="btn primary" id="exGo"'+(mp.length?'':' disabled')+'>صدّر الملف</button><button class="btn" id="exNo">إلغاء</button><span class="msg" id="exMsg">'+(mp.length?'':'ما فيه بوستات بهالشهر')+'</span></footer></div></div>';
+  const close=()=>root.innerHTML="";
+  $("#exX").onclick=close;$("#exNo").onclick=close;
+  root.querySelector(".overlay").onclick=e=>{if(e.target.classList.contains("overlay"))close()};
+  $("#exGo").onclick=async()=>{
+    const snapOnly=root.querySelector('input[name="exMode"]:checked').value==="snap";
+    $("#exGo").disabled=true;$("#exMsg").textContent="جاري تجهيز الملف…";
+    try{
+      const {buf,name}=await buildXlsx(mp,snapOnly);
+      $("#exMsg").textContent="";
+      const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+      close();toast("تم التصدير");
+    }catch(e){
+      $("#exGo").disabled=false;
+      $("#exMsg").textContent=(e&&e.code==="declined")?"انلغى التنزيل":"ما قدرت أصدّر الملف، جرّب مرة ثانية";
+    }
+  };
+}
+async function buildXlsx(posts,snapOnly){
+  await loadExcelJS();
+  const wb=new ExcelJS.Workbook();
+  const ws=wb.addWorksheet("Calendar",{views:[{state:"frozen",ySplit:3,showGridLines:false}]});
+  ws.columns=[{width:15},{width:11},{width:22},{width:50},{width:12},{width:12},{width:13},{width:40}];
+  const LINE={style:"thin",color:{argb:"FFD5DEF0"}};
+  const fill=c=>({type:"pattern",pattern:"solid",fgColor:{argb:c}});
+  const ps=posts.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:sortPosts(a,b));
+  const d0=parseISO(ps[0].date),d1=parseISO(ps[ps.length-1].date);
+  const range=EN_MON[d0.getUTCMonth()]+" "+d0.getUTCDate()+(ps[0].date===ps[ps.length-1].date?"":" – "+(d0.getUTCMonth()===d1.getUTCMonth()?"":EN_MON[d1.getUTCMonth()]+" ")+d1.getUTCDate())+", "+d1.getUTCFullYear();
+  ws.mergeCells("A1:H1");
+  const t=ws.getCell("A1");t.value="Mobily Consumer Calendar  ·  "+range;
+  t.font={name:"Arial",size:18,bold:true,color:{argb:"FFFFFFFF"}};t.fill=fill("FF0E61FE");t.alignment={vertical:"middle",indent:1};
+  ws.getRow(1).height=36;ws.getRow(2).height=6;
+  ["Date","Time","Visual","Caption","Design","Animation","Platform","Landing Page"].forEach((h,i)=>{
+    const c=ws.getRow(3).getCell(i+1);c.value=h;c.font={name:"Arial",size:11,bold:true,color:{argb:"FFFFFFFF"}};
+    c.fill=fill("FF0A1A4A");c.alignment={horizontal:"center",vertical:"middle"};
+  });
+  ws.getRow(3).height=26;
+  const plats=snapOnly?[["Snapchat","Snapchat"]]:PLATS;
+  const per=plats.length;
+  const rowH=snapOnly?120:32;
+  let r=4;let dayIdx=-1;let lastDate=null;
+  const byDay={};ps.forEach(p=>{(byDay[p.date]=byDay[p.date]||[]).push(p)});
+  const imgCache={};
+  for(const ds of Object.keys(byDay).sort()){
+    dayIdx++;const dayPosts=byDay[ds];const dayStart=r;
+    const base=dayIdx%2?"FFFFFFFF":"FFF6F9FF";
+    for(const p of dayPosts){
+      const rowFill=missing(p).length?"FFFFF4D6":base;
+      for(let i=0;i<per;i++){
+        const row=ws.getRow(r+i);row.height=rowH;
+        for(let c=2;c<=8;c++){const cell=row.getCell(c);cell.fill=fill(rowFill);cell.border={top:LINE,bottom:LINE,left:LINE,right:LINE};cell.alignment={horizontal:"center",vertical:"middle",wrapText:true};}
+      }
+      const row=ws.getRow(r);
+      // time
+      const tc=row.getCell(2);
+      if(p.time){const [hh,mm]=p.time.split(":").map(Number);tc.value=(hh*60+mm)/1440;tc.numFmt="h:mm AM/PM"}else tc.value="TBD";
+      tc.font={name:"Arial",size:11,bold:true,color:{argb:"FF0A1A4A"}};
+      // caption
+      const cc=row.getCell(4);cc.value=(p.caption&&p.caption.trim())||"TBD";
+      cc.font={name:"Arial",size:10,color:{argb:"FF1F2A44"}};cc.alignment={horizontal:"right",vertical:"middle",wrapText:true,readingOrder:"rtl"};
+      // design + animation
+      [[5,p.design],[6,p.animation]].forEach(([c,u])=>{
+        const cell=row.getCell(c);
+        if(u){cell.value={text:"Open ↗",hyperlink:u};cell.font={name:"Arial",size:10,bold:true,color:{argb:"FF0E61FE"}}}
+        else{cell.value="—";cell.font={name:"Arial",size:10,color:{argb:"FFB0B7C6"}}}
+      });
+      // platforms
+      plats.forEach(([k,l],i)=>{
+        const pr=ws.getRow(r+i);
+        const g=pr.getCell(7);g.value=l;g.font={name:"Arial",size:10,bold:true,color:{argb:PLAT_COLOR[k]}};
+        const urls=String((p.links&&p.links[k])||"").split(/\s+/).filter(Boolean);
+        const h=pr.getCell(8);
+        if(urls.length){h.value={text:urls.join("\n"),hyperlink:urls[0]};h.font={name:"Arial",size:10,color:{argb:"FF0E61FE"}}}
+        else{h.value="TBD";h.font={name:"Arial",size:10,color:{argb:"FFB0B7C6"}}}
+        h.alignment={horizontal:"left",vertical:"middle",wrapText:true};
+      });
+      if(per>1)["B","C","D","E","F"].forEach(col=>ws.mergeCells(col+r+":"+col+(r+per-1)));
+      // visual
+      const m=(p.media||[]).find(x=>!isVideo(x));if(m)m.id=m.path;
+      if(m){
+        try{
+          const im=imgCache[m.id]||(imgCache[m.id]=await imageJpeg(m.id));
+          const id=wb.addImage({base64:im.b64,extension:"jpeg"});
+          const size=150,blockPx=rowH*per*4/3;
+          const w=im.w>=im.h?size:Math.round(size*im.w/im.h),h=im.h>=im.w?size:Math.round(size*im.h/im.w);
+          const offY=Math.max(0,(blockPx-h)/2)/(rowH*4/3),offX=Math.max(0,(159-w)/2)/159;
+          ws.addImage(id,{tl:{col:2+offX,row:(r-1)+offY},ext:{width:w,height:h},editAs:"oneCell"});
+        }catch(e){row.getCell(3).value="—"}
+      }else if((p.media||[]).length){row.getCell(3).value="فيديو"}
+      r+=per;
+    }
+    // day cell
+    const dd=parseISO(ds);
+    if(r-1>dayStart)ws.mergeCells("A"+dayStart+":A"+(r-1));
+    const a=ws.getCell("A"+dayStart);
+    a.value=EN_DAYS[dd.getUTCDay()]+"\n"+dd.getUTCDate()+" "+EN_MON[dd.getUTCMonth()];
+    a.font={name:"Arial",size:12,bold:true,color:{argb:"FF0E61FE"}};a.fill=fill("FFEAF1FF");
+    a.alignment={horizontal:"center",vertical:"middle",wrapText:true};
+    a.border={top:{style:"medium",color:{argb:"FF0A1A4A"}},bottom:LINE,left:LINE,right:LINE};
+    for(let c=2;c<=8;c++){const cell=ws.getRow(dayStart).getCell(c);cell.border=Object.assign({},cell.border,{top:{style:"medium",color:{argb:"FF0A1A4A"}}})}
+  }
+  const buf=await wb.xlsx.writeBuffer();
+  const name="Mobily_Calendar_"+EN_MON[d0.getUTCMonth()]+d0.getUTCDate()+"-"+(d0.getUTCMonth()===d1.getUTCMonth()?"":EN_MON[d1.getUTCMonth()])+d1.getUTCDate()+(snapOnly?"_Snapchat":"")+".xlsx";
+  return {buf,name};
+}
+
+/* ---------- controls ---------- */
+function shiftMonth(n){const [y,m]=S.ym.split("-").map(Number);const d=new Date(Date.UTC(y,m-1+n,1));S.ym=d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1);render();window.scrollTo(0,0)}
+$("#prevM").onclick=()=>shiftMonth(-1);
+$("#nextM").onclick=()=>shiftMonth(1);
+$("#vList").onclick=()=>{S.view="list";render()};
+$("#vMonth").onclick=()=>{S.view="month";render()};
+$("#exportBtn").onclick=openExport;
+$("#addBtn").onclick=()=>openEditor(null,S.ym===todayISO.slice(0,7)?todayISO:S.ym+"-01");
+
+init();
+})();
+</script>
+</body>
+</html>
