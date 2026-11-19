@@ -284,6 +284,12 @@ details.plat{border-top-color:var(--line)}
 .card{border-radius:16px}
 .body{padding:9px 10px;gap:7px}
 .cap{font-size:12.5px;line-height:1.55}
+.ttl{margin:0;display:flex;align-items:flex-start;gap:7px;font-family:var(--f-display);font-weight:700;font-size:14px;line-height:1.35;color:var(--ink);letter-spacing:-.01em;overflow-wrap:anywhere}
+.ttl::before{content:"";flex:none;width:3px;align-self:stretch;min-height:16px;border-radius:3px;background:var(--accent)}
+.ttl span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ttl.none{color:var(--muted);font-weight:500;font-size:12.5px}
+.ttl.none::before{background:var(--line)}
+.lb aside .lb-ttl{font-size:20px;font-weight:700;margin:0 0 2px}
 .cap.clamp{-webkit-line-clamp:3}
 .more{font-size:12px}
 .time{font-size:11.5px;padding:1px 8px;top:6px;right:6px}
@@ -448,8 +454,13 @@ async function signPaths(paths){
   if(!error&&data)data.forEach(d=>{if(d.signedUrl)S.urls[d.path]=d.signedUrl});
 }
 function isVideo(m){return m&&m.type==="video"}
+/* post name: stored in the "title" column; until that column exists it lives in links._title */
+function postTitle(p){return String((p&&(p.title||(p.links&&p.links._title)))||"").trim()}
+function withTitle(data,t){t=String(t||"").trim();const links=Object.assign({},data.links||{});delete links._title;
+  if(S.hasTitle)return Object.assign(data,{title:t,links});if(t)links._title=t;return Object.assign(data,{links})}
 function missing(p){
   const out=[];
+  if(!postTitle(p))out.push("بدون اسم");
   if(!(p.media&&p.media.length))out.push("بدون صورة");
   if(!p.design||!String(p.design).trim())out.push("بدون ملفات تصميم");
   if(!p.caption||!p.caption.trim())out.push("بدون كابشن");
@@ -492,6 +503,7 @@ async function loadPosts(first){
   if(timer)clearTimeout(timer);
   if(error){$("#main").innerHTML='<div class="notice">صار خطأ في تحميل المحتوى. حدّث الصفحة.</div>';return}
   S.posts=data||[];
+  if(S.posts.length)S.hasTitle="title" in S.posts[0];
   await signPaths(S.posts.flatMap(p=>(p.media||[]).map(m=>m.path)));
   S.loaded=true;
   if(first&&S.posts.length){
@@ -574,6 +586,8 @@ function card(p){
   if(p.animation)links.push('<a class="lk" href="'+esc(p.animation)+'" target="_blank" rel="noopener">الأنيميشن ↗</a>');
   const pl=PLATS.filter(([k])=>p.links&&p.links[k]);
   let body='<div class="body">';
+  const nm=postTitle(p);
+  body+=nm?'<h3 class="ttl"><span>'+esc(nm)+'</span></h3>':'<h3 class="ttl none"><span>بدون اسم</span></h3>';
   if(ms.length)body+='<div class="nr">مو جاهز للنشر</div><div class="badges">'+ms.map(b=>'<span class="badge">'+b+'</span>').join("")+'</div>';
   if(p.caption&&p.caption.trim())body+='<p class="cap clamp">'+esc(p.caption.trim())+'</p><button class="more hidden">اقرأ الكابشن كامل</button>';
   if(p.note&&p.note.trim())body+='<p class="cap hint">ملاحظة: '+esc(p.note)+'</p>';
@@ -629,7 +643,7 @@ function renderMonth(mp){
     c.innerHTML='<div class="n"><span>'+d+'</span>'+'</div><div class="thumbs"></div>';
     const th=c.querySelector(".thumbs");
     ps.slice(0,4).forEach(p=>{
-      const t=document.createElement("div");t.className="t"+(missing(p).length?" miss":"");t.title=fmtTime(p.time);
+      const t=document.createElement("div");t.className="t"+(missing(p).length?" miss":"");t.title=(postTitle(p)?postTitle(p)+" · ":"")+fmtTime(p.time);
       const m=(p.media||[])[0];
       t.innerHTML=(m?(isVideo(m)?'<video src="'+mediaUrl(m)+'" muted preload="metadata"></video>':'<img loading="lazy" alt="" src="'+mediaUrl(m)+'">'):'')+'<i>'+esc(p.time||"؟")+'</i>';
       if(S.canEdit){t.draggable=true;
@@ -656,7 +670,7 @@ function openLightbox(p,i){
       '<button class="x" aria-label="إغلاق">✕</button>'+
       (isVideo(m)?'<video src="'+mediaUrl(m)+'" controls autoplay playsinline></video>':'<img alt="تصميم البوست" src="'+mediaUrl(m)+'">')+
       (media.length>1?'<button class="nav prev" aria-label="السابق">›</button><button class="nav next" aria-label="التالي">‹</button><span class="pos">'+(i+1)+' / '+media.length+'</span>':'')+
-      '</div><aside><h3>'+dayName(p.date)+' '+shortDate(p.date)+' · '+esc(fmtTime(p.time))+'</h3><p>'+esc(p.caption||"الكابشن لسا ما نزل")+'</p></aside></div>';
+      '</div><aside>'+(postTitle(p)?'<h2 class="lb-ttl">'+esc(postTitle(p))+'</h2>':'')+'<h3>'+dayName(p.date)+' '+shortDate(p.date)+' · '+esc(fmtTime(p.time))+'</h3><p>'+esc(p.caption||"الكابشن لسا ما نزل")+'</p></aside></div>';
     root.querySelector(".x").onclick=close;
     root.querySelector(".lb").onclick=e=>{if(e.target.classList.contains("stage"))close()};
     const pv=root.querySelector(".prev"),nx=root.querySelector(".next");
@@ -688,6 +702,7 @@ function openEditor(p,dateForNew,isDup){
   root.innerHTML='<div class="overlay"><form class="modal" role="dialog" aria-modal="true" id="ed">'+
    '<header><h2>'+(isDup?'تكرار بوست':isNew?'بوست جديد':'تعديل البوست')+'</h2><button type="button" class="icon-btn" id="edX" aria-label="إغلاق">✕</button></header>'+
    '<div class="content">'+
+    '<div class="field"><label for="fTitle">اسم المنشور</label><input type="text" id="fTitle" maxlength="80" value="'+esc(postTitle(v))+'" placeholder="مثلًا: AirPods 5 أو باقة 100GB"></div>'+
     '<div class="field"><label>التاريخ <span class="hint" id="dLabel"></span></label><input type="hidden" id="fDate" value="'+esc(v.date||dateForNew||todayISO)+'"><div class="dp" id="dp"></div></div>'+
     '<div class="field"><label>الوقت <span class="hint" id="tLabel"></span></label><div class="tp" id="tp">'+
       '<div class="tp-pre">'+PRESETS.map(([t,l])=>'<button type="button" class="tp-chip" data-p="'+t+'"><b>'+fmtTime(t).replace(/ [صم]$/,"")+'</b><small>'+l+'</small></button>').join("")+
@@ -832,6 +847,7 @@ function openEditor(p,dateForNew,isDup){
       media:st.media,design:$("#fDesign").value.trim(),animation:$("#fAnim").value.trim(),
       links,landing:$("#fLanding").value.trim(),note:$("#fNote").value.trim(),updated_at:new Date().toISOString()
     };
+    withTitle(data,$("#fTitle").value);
     if(!data.date){$("#edMsg").textContent="حدد التاريخ";return}
     $("#edSave").disabled=true;$("#edMsg").textContent="جاري الحفظ…";
     try{
@@ -904,17 +920,17 @@ async function buildXlsx(posts,snapOnly,full){
   await loadExcelJS();
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet("Calendar",{views:[{state:"frozen",ySplit:3,showGridLines:false}]});
-  ws.columns=[{width:15},{width:11},{width:22},{width:50},{width:12},{width:12},{width:13},{width:40}];
+  ws.columns=[{width:15},{width:11},{width:24},{width:22},{width:50},{width:12},{width:12},{width:13},{width:40}];
   const LINE={style:"thin",color:{argb:"FFD5DEF0"}};
   const fill=c=>({type:"pattern",pattern:"solid",fgColor:{argb:c}});
   const ps=posts.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:sortPosts(a,b));
   const d0=full?parseISO(S.ym+"-01"):parseISO(ps[0].date),d1=full?parseISO(S.ym+"-"+pad(daysInMonth())):parseISO(ps[ps.length-1].date);
   const range=full?EN_MON[d0.getUTCMonth()]+" 1 – "+d1.getUTCDate()+", "+d1.getUTCFullYear():EN_MON[d0.getUTCMonth()]+" "+d0.getUTCDate()+(ps[0].date===ps[ps.length-1].date?"":" – "+(d0.getUTCMonth()===d1.getUTCMonth()?"":EN_MON[d1.getUTCMonth()]+" ")+d1.getUTCDate())+", "+d1.getUTCFullYear();
-  ws.mergeCells("A1:H1");
+  ws.mergeCells("A1:I1");
   const t=ws.getCell("A1");t.value="Mobily Consumer Calendar  ·  "+range;
   t.font={name:XF_HEAD,size:18,bold:true,color:{argb:"FFFFFFFF"}};t.fill=fill("FF0E61FE");t.alignment={vertical:"middle",indent:1};
   ws.getRow(1).height=36;ws.getRow(2).height=6;
-  ["Date","Time","Visual","Caption","Design","Animation","Platform","Landing Page"].forEach((h,i)=>{
+  ["Date","Time","Post Name","Visual","Caption","Design","Animation","Platform","Landing Page"].forEach((h,i)=>{
     const c=ws.getRow(3).getCell(i+1);c.value=h;c.font={name:XF_HEAD,size:11,bold:true,color:{argb:"FFFFFFFF"}};
     c.fill=fill("FF0A1A4A");c.alignment={horizontal:"center",vertical:"middle"};
   });
@@ -933,27 +949,30 @@ async function buildXlsx(posts,snapOnly,full){
       if(!p){
         for(let i=0;i<per;i++){
           const row=ws.getRow(r+i);row.height=rowH;
-          for(let c=2;c<=8;c++){const cell=row.getCell(c);cell.fill=fill(base);cell.border={top:LINE,bottom:LINE,left:LINE,right:LINE};cell.alignment={horizontal:"center",vertical:"middle",wrapText:true};}
-          const g=row.getCell(7);g.value=plats[i][1];g.font={name:XF_HEAD,size:10,bold:true,color:{argb:PLAT_COLOR[plats[i][0]]}};
+          for(let c=2;c<=9;c++){const cell=row.getCell(c);cell.fill=fill(base);cell.border={top:LINE,bottom:LINE,left:LINE,right:LINE};cell.alignment={horizontal:"center",vertical:"middle",wrapText:true};}
+          const g=row.getCell(8);g.value=plats[i][1];g.font={name:XF_HEAD,size:10,bold:true,color:{argb:PLAT_COLOR[plats[i][0]]}};
         }
-        if(per>1)["B","C","D","E","F"].forEach(col=>ws.mergeCells(col+r+":"+col+(r+per-1)));
+        if(per>1)["B","C","D","E","F","G"].forEach(col=>ws.mergeCells(col+r+":"+col+(r+per-1)));
         r+=per;continue;
       }
       const rowFill=missing(p).length?"FFFFF4D6":base;
       for(let i=0;i<per;i++){
         const row=ws.getRow(r+i);row.height=rowH;
-        for(let c=2;c<=8;c++){const cell=row.getCell(c);cell.fill=fill(rowFill);cell.border={top:LINE,bottom:LINE,left:LINE,right:LINE};cell.alignment={horizontal:"center",vertical:"middle",wrapText:true};}
+        for(let c=2;c<=9;c++){const cell=row.getCell(c);cell.fill=fill(rowFill);cell.border={top:LINE,bottom:LINE,left:LINE,right:LINE};cell.alignment={horizontal:"center",vertical:"middle",wrapText:true};}
       }
       const row=ws.getRow(r);
       // time
       const tc=row.getCell(2);
       if(p.time){const [hh,mm]=p.time.split(":").map(Number);tc.value=(hh*60+mm)/1440;tc.numFmt="h:mm AM/PM"}else tc.value="TBD";
       tc.font={name:XF_HEAD,size:11,bold:true,color:{argb:"FF0A1A4A"}};
+      // post name
+      const nc=row.getCell(3);const nm=postTitle(p);nc.value=nm||"TBD";
+      nc.font={name:XF_HEAD,size:11,bold:true,color:{argb:nm?"FF0A1A4A":"FFB0B7C6"}};nc.alignment={horizontal:"center",vertical:"middle",wrapText:true,readingOrder:"rtl"};
       // caption
-      const cc=row.getCell(4);cc.value=(p.caption&&p.caption.trim())||"TBD";
+      const cc=row.getCell(5);cc.value=(p.caption&&p.caption.trim())||"TBD";
       cc.font={name:XF_TEXT,size:10,color:{argb:"FF1F2A44"}};cc.alignment={horizontal:"right",vertical:"middle",wrapText:true,readingOrder:"rtl"};
       // design + animation
-      [[5,p.design],[6,p.animation]].forEach(([c,u])=>{
+      [[6,p.design],[7,p.animation]].forEach(([c,u])=>{
         const cell=row.getCell(c);
         if(u){cell.value={text:"Open ↗",hyperlink:u};cell.font={name:XF_HEAD,size:10,bold:true,color:{argb:"FF0E61FE"}}}
         else{cell.value="—";cell.font={name:XF_TEXT,size:10,color:{argb:"FFB0B7C6"}}}
@@ -961,14 +980,14 @@ async function buildXlsx(posts,snapOnly,full){
       // platforms
       plats.forEach(([k,l],i)=>{
         const pr=ws.getRow(r+i);
-        const g=pr.getCell(7);g.value=l;g.font={name:XF_HEAD,size:10,bold:true,color:{argb:PLAT_COLOR[k]}};
+        const g=pr.getCell(8);g.value=l;g.font={name:XF_HEAD,size:10,bold:true,color:{argb:PLAT_COLOR[k]}};
         const urls=String((p.links&&p.links[k])||"").split(/\s+/).filter(Boolean);
-        const h=pr.getCell(8);
+        const h=pr.getCell(9);
         if(urls.length){h.value={text:urls.join("\n"),hyperlink:urls[0]};h.font={name:XF_TEXT,size:10,color:{argb:"FF0E61FE"}}}
         else{h.value="TBD";h.font={name:XF_TEXT,size:10,color:{argb:"FFB0B7C6"}}}
         h.alignment={horizontal:"left",vertical:"middle",wrapText:true};
       });
-      if(per>1)["B","C","D","E","F"].forEach(col=>ws.mergeCells(col+r+":"+col+(r+per-1)));
+      if(per>1)["B","C","D","E","F","G"].forEach(col=>ws.mergeCells(col+r+":"+col+(r+per-1)));
       // visual
       const m=(p.media||[]).find(x=>!isVideo(x));if(m)m.id=m.path;
       if(m){
@@ -978,9 +997,9 @@ async function buildXlsx(posts,snapOnly,full){
           const size=150,blockPx=rowH*per*4/3;
           const w=im.w>=im.h?size:Math.round(size*im.w/im.h),h=im.h>=im.w?size:Math.round(size*im.h/im.w);
           const offY=Math.max(0,(blockPx-h)/2)/(rowH*4/3),offX=Math.max(0,(159-w)/2)/159;
-          ws.addImage(id,{tl:{col:2+offX,row:(r-1)+offY},ext:{width:w,height:h},editAs:"oneCell"});
-        }catch(e){row.getCell(3).value="—"}
-      }else if((p.media||[]).length){row.getCell(3).value="فيديو"}
+          ws.addImage(id,{tl:{col:3+offX,row:(r-1)+offY},ext:{width:w,height:h},editAs:"oneCell"});
+        }catch(e){row.getCell(4).value="—"}
+      }else if((p.media||[]).length){row.getCell(4).value="فيديو"}
       r+=per;
     }
     // day cell
@@ -991,7 +1010,7 @@ async function buildXlsx(posts,snapOnly,full){
     a.font={name:XF_HEAD,size:12,bold:true,color:{argb:"FF0E61FE"}};a.fill=fill("FFEAF1FF");
     a.alignment={horizontal:"center",vertical:"middle",wrapText:true};
     a.border={top:{style:"medium",color:{argb:"FF0A1A4A"}},bottom:LINE,left:LINE,right:LINE};
-    for(let c=2;c<=8;c++){const cell=ws.getRow(dayStart).getCell(c);cell.border=Object.assign({},cell.border,{top:{style:"medium",color:{argb:"FF0A1A4A"}}})}
+    for(let c=2;c<=9;c++){const cell=ws.getRow(dayStart).getCell(c);cell.border=Object.assign({},cell.border,{top:{style:"medium",color:{argb:"FF0A1A4A"}}})}
   }
     // Mobily brand fonts on every cell, including ones without their own font
   ws.eachRow({includeEmpty:true},row=>row.eachCell({includeEmpty:true},cell=>{
@@ -1011,7 +1030,7 @@ const GH_REPO="Mohammed6129/mobily-calendar";
 const FEED={acts:[],commits:[],filter:"all"};
 const FICON={"create": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg>", "delete": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 6h18\"/><path d=\"M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6\"/></svg>", "move": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4\"/></svg>", "update": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z\"/></svg>", "media": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"9\" cy=\"9\" r=\"2\"/><path d=\"M21 15l-5-5L5 21\"/></svg>", "links": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1\"/><path d=\"M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1\"/></svg>", "time": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>", "dev": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 6l-6 6 6 6M16 6l6 6-6 6\"/></svg>", "feed": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12h4l3 8 4-16 3 8h4\"/></svg>"};
 const VERB={create:["أضفت","أضاف"],delete:["حذفت","حذف"],move:["نقلت","نقل"],update:["عدّلت","عدّل"],media:["رفعت تصميم لـ","رفع تصميم لـ"],links:["حدّثت روابط","حدّث روابط"],time:["غيّرت وقت","غيّر وقت"],dev:["طوّرت","طوّر"]};
-const FIELD_AR={date:"التاريخ",time:"الوقت",caption:"الكابشن",media:"التصميم",design:"رابط ملفات التصميم",animation:"رابط الأنيميشن",links:"الروابط المختصرة",landing:"الرابط الأصلي",note:"الملاحظة"};
+const FIELD_AR={title:"اسم المنشور",date:"التاريخ",time:"الوقت",caption:"الكابشن",media:"التصميم",design:"رابط ملفات التصميم",animation:"رابط الأنيميشن",links:"الروابط المختصرة",landing:"الرابط الأصلي",note:"الملاحظة"};
 function personOf(email){if(!email||email==="system")return {name:"النظام",cls:"s",key:"system"};const p=PEOPLE[email.toLowerCase()];return {name:p?p.name:email.split("@")[0],cls:p?p.cls:"s",key:email.toLowerCase()}}
 function personOfGh(login){const e=Object.keys(PEOPLE).find(k=>PEOPLE[k].gh===String(login||"").toLowerCase());return e?Object.assign(personOf(e),{key:e}):{name:login||"؟",cls:"s",key:"gh:"+login}}
 function whoVerb(per,verb){const me=per.key===S.me;return {who:me?"أنت":per.name,v:VERB[verb][me?0:1]}}
@@ -1165,6 +1184,11 @@ async function parseCalendarXlsx(file){
   let header=0,year=new Date().getFullYear();
   ws.eachRow((row,r)=>{const a=cellText(row.getCell(1).value);const y=a.match(/(20\d\d)/);if(y&&r<4)year=+y[1];if(!header&&/^date$/i.test(a.trim())&&/time/i.test(cellText(row.getCell(2).value)))header=r});
   if(!header)throw new Error("ما لقيت صف العناوين (Date / Time)");
+  // column positions from the header row (works with and without the "Post Name" column)
+  const COL={caption:4,design:5,animation:6,platform:7,landing:8,name:0};
+  ws.getRow(header).eachCell((c,i)=>{const h=cellText(c.value).trim().toLowerCase();
+    if(h==="post name"||h==="اسم المنشور")COL.name=i;else if(h==="caption")COL.caption=i;else if(h==="design")COL.design=i;
+    else if(h==="animation")COL.animation=i;else if(h==="platform")COL.platform=i;else if(h==="landing page")COL.landing=i});
   const posts=[];let date=null,cur=null;
   for(let r=header+1;r<=ws.rowCount;r++){
     const row=ws.getRow(r);
@@ -1175,13 +1199,13 @@ async function parseCalendarXlsx(file){
     }
     const bSlave=B.isMerged&&B.master.address!==B.address;
     if(!bSlave&&B.value!=null&&cellText(B.value).trim()!==""&&date){
-      cur={date,time:cellTime(B.value),caption:clean(cellText(row.getCell(4).value)),design:cellLink(row.getCell(5).value),animation:cellLink(row.getCell(6).value),links:{},img:imgs[r]||null};
+      cur={date,time:cellTime(B.value),title:COL.name?clean(cellText(row.getCell(COL.name).value)):"",caption:clean(cellText(row.getCell(COL.caption).value)),design:cellLink(row.getCell(COL.design).value),animation:cellLink(row.getCell(COL.animation).value),links:{},img:imgs[r]||null};
       posts.push(cur);
     }
     if(cur){
-      const plat=cellText(row.getCell(7).value).trim();
+      const plat=cellText(row.getCell(COL.platform).value).trim();
       const key=PLATS.map(x=>x[0]).find(k=>k.toLowerCase()===plat.toLowerCase());
-      if(key){const h=row.getCell(8).value;const urls=(cellLink(h)?[cellLink(h)]:[]).concat(cellText(h).split(/\s+/).filter(u=>/^https?:\/\//.test(u)));const u=[...new Set(urls)].join("\n");if(u)cur.links[key]=u}
+      if(key){const h=row.getCell(COL.landing).value;const urls=(cellLink(h)?[cellLink(h)]:[]).concat(cellText(h).split(/\s+/).filter(u=>/^https?:\/\//.test(u)));const u=[...new Set(urls)].join("\n");if(u)cur.links[key]=u}
     }
   }
   return posts;
@@ -1256,7 +1280,7 @@ function openImport(){
           const {error}=await sb.storage.from(BUCKET).upload(path,blob,{contentType:blob.type});
           if(!error)media.push({path,type:"image"});
         }
-        const row={date:p.date,time:p.time,caption:p.caption,media,design:p.design,animation:p.animation,links:p.links,landing:"",note:""};
+        const row=withTitle({date:p.date,time:p.time,caption:p.caption,media,design:p.design,animation:p.animation,links:p.links,landing:"",note:""},p.title);
         const {error}=await sb.from("posts").insert(row);if(error)throw error;
       }
       close();toast("انضاف "+parsed.length+" بوست");
