@@ -8,7 +8,8 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
 - **Supabase** project `mobily-calendar` (ref `uwcdhpptemykyivfmqvd`):
   - table `public.posts` — `id, date ('YYYY-MM-DD'), time ('HH:MM' or ''), caption, media (jsonb [{path,type}]), design, animation, links (jsonb {X,Instagram,Facebook,TikTok,Snapchat}), landing, note, updated_at`
   - private storage bucket `media`; the app shows files through signed URLs
-  - RLS: only signed-in users can read/write. Sign-ups are disabled; people are invited from Supabase → Authentication → Users.
+  - **No sign-in (Mohammed's decision, 19 Nov 2026):** RLS lets the anon key read and write `posts`, `dictionary`, the `media` bucket, and read `activity`. Anyone with the link can view and edit. See `supabase/open-access.sql`.
+  - The site asks once per browser «مين أنت؟» (محمد / علي), keeps it in localStorage, and sends it as the `x-actor` header; the activity trigger records it as the actor.
   - realtime is on for `posts`, so open pages refresh by themselves.
   - table `public.dictionary` — shared spelling whitelist (`word`).
   - table `public.activity` — change log filled by the `posts_activity` trigger (who did what to which post). Kept 90 days. See `supabase/activity.sql`.

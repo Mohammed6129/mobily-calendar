@@ -373,6 +373,8 @@ body.feed-off .feed-btn{display:inline-flex}
 .login-card input{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.8);border-radius:12px;padding:10px 12px;direction:ltr;text-align:left}
 .login-card .btn{justify-content:center;padding:10px 14px}
 .who{display:flex;gap:8px;align-items:center}
+.who-pick{display:flex;gap:10px;flex-wrap:wrap}
+.who-pick .btn{flex:1;justify-content:center;padding:12px 14px;font-size:15px}
 .who button{border:0;background:none;color:var(--accent);font-size:13px;padding:0}
 </style>
 </head>
@@ -381,7 +383,7 @@ body.feed-off .feed-btn{display:inline-flex}
   <div class="top-in">
     <div class="brand">
       <h1>تقويم محتوى موبايلي</h1>
-      <small class="who"><span id="roleLine">جاري التحميل…</span><button id="signOut" class="hidden" type="button">تسجيل خروج</button></small>
+      <small class="who"><span id="roleLine">جاري التحميل…</span><button id="whoChange" class="hidden" type="button">تغيير</button></small>
     </div>
     <div class="month-nav">
       <button class="icon-btn" id="prevM" aria-label="الشهر السابق">›</button>
@@ -409,13 +411,11 @@ body.feed-off .feed-btn{display:inline-flex}
   <div class="feed-list" id="feedList"><div class="hint">جاري التحميل…</div></div>
 </aside></div>
 
-<div class="login hidden" id="login"><form class="login-card" id="loginForm">
+<div class="login hidden" id="login"><div class="login-card">
   <h2>تقويم محتوى موبايلي</h2>
-  <p>اكتب إيميلك ونرسل لك رابط الدخول.</p>
-  <input type="email" id="loginEmail" required placeholder="name@example.com" autocomplete="email">
-  <button class="btn primary" type="submit" id="loginBtn">أرسل رابط الدخول</button>
-  <p id="loginMsg" aria-live="polite"></p>
-</form></div>
+  <p>مين أنت؟ عشان يطلع اسمك في سجل التحديثات.</p>
+  <div class="who-pick" id="whoPick"></div>
+</div></div>
 <div id="modalRoot"></div>
 <div id="lbRoot"></div>
 
@@ -428,7 +428,8 @@ const PRESETS=[["11:00","الصبح"],["15:00","العصر"],["19:00","المغ�
 const PLATS=[["X","X"],["Instagram","Instagram"],["Facebook","Facebook"],["TikTok","TikTok"],["Snapchat","Snapchat"]];
 
 const S={posts:[],ym:null,view:"list",canEdit:false,db:null,onlyMissing:false,showEmpty:false,loaded:false,dragId:null,urls:{}};
-const sb=window.supabase.createClient(window.MC_CONFIG.url,window.MC_CONFIG.anonKey);
+let sb=null;
+function makeClient(who){sb=window.supabase.createClient(window.MC_CONFIG.url,window.MC_CONFIG.anonKey,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:{"x-actor":who||"unknown"}}})}
 const BUCKET="media";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -466,29 +467,20 @@ function sortPosts(a,b){return (a.time||"99")<(b.time||"99")?-1:(a.time||"99")>(
 async function init(){
   S.ym=todayISO.slice(0,7);
   render();
-  $("#loginForm").onsubmit=async e=>{
-    e.preventDefault();
-    const email=$("#loginEmail").value.trim().toLowerCase();
-    $("#loginBtn").disabled=true;$("#loginMsg").textContent="جاري الإرسال…";
-    const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.origin}});
-    $("#loginBtn").disabled=false;
-    if(error){$("#loginMsg").textContent=/signup|not allowed|not found/i.test(error.message)?"هذا الإيميل ما له صلاحية دخول.":/rate|seconds/i.test(error.message)?"انتظر شوي وجرّب مرة ثانية.":"ما انرسل الرابط: "+error.message}
-    else $("#loginMsg").textContent="أرسلنا لك رابط الدخول. افتح إيميلك واضغط عليه من نفس الجهاز.";
-  };
-  $("#signOut").onclick=async()=>{await sb.auth.signOut();location.reload()};
-  const {data:{session}}=await sb.auth.getSession();
-  sb.auth.onAuthStateChange((ev,sess)=>{if(ev==="SIGNED_IN"&&!S.started)start(sess);if(ev==="SIGNED_OUT")location.reload()});
-  if(session)start(session);
-  else{$("#login").classList.remove("hidden");$("#main").innerHTML="";$("#roleLine").textContent="سجّل دخولك"}
+  let who=null;try{who=localStorage.getItem("mc-who")}catch(e){}
+  $("#whoChange").onclick=()=>{try{localStorage.removeItem("mc-who")}catch(e){}location.reload()};
+  if(who&&PEOPLE[who]){start(who);return}
+  $("#whoPick").innerHTML=Object.keys(PEOPLE).map(e=>'<button type="button" class="btn primary" data-e="'+esc(e)+'">أنا '+esc(PEOPLE[e].name)+'</button>').join("");
+  $("#whoPick").querySelectorAll("button").forEach(b=>b.onclick=()=>{try{localStorage.setItem("mc-who",b.dataset.e)}catch(e){}start(b.dataset.e)});
+  $("#login").classList.remove("hidden");$("#main").innerHTML="";$("#roleLine").textContent="";
 }
-async function start(session){
+async function start(who){
   if(S.started)return;S.started=true;
+  makeClient(who);
   $("#login").classList.add("hidden");
-  S.canEdit=true;S.db=true;
-  $("#addBtn").classList.remove("hidden");$("#importBtn").classList.remove("hidden");$("#exportBtn").classList.remove("hidden");$("#signOut").classList.remove("hidden");
-  $("#roleLine").textContent=session.user.email;
-  if(location.hash.includes("access_token"))history.replaceState(null,"",location.pathname);
-  S.me=String(session.user.email||"").toLowerCase();
+  S.canEdit=true;S.db=true;S.me=who;
+  $("#addBtn").classList.remove("hidden");$("#importBtn").classList.remove("hidden");$("#exportBtn").classList.remove("hidden");$("#whoChange").classList.remove("hidden");
+  $("#roleLine").textContent="أهلًا "+PEOPLE[who].name;
   await loadPosts(true);
   startFeed();
   let t=null;
