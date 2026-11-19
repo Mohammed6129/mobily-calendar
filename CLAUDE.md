@@ -18,7 +18,7 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
 - Libraries come from CDNs (supabase-js, ExcelJS, JSZip). Pin exact versions.
 
 ## Product rules (agreed with Mohammed)
-- UI is Arabic, RTL, Saudi dialect, frosted-glass surfaces on a calm mid-light grey background (`--bg:#d3d6dc`, surfaces `#e1e4e8`) with muted, non-glaring colors (accent `#2a5288`) — easy on the eyes. Avoid bright white surfaces and saturated colors. No dark mode.
+- UI is Arabic, RTL, Saudi dialect. Mobily identity: page background is Mobily navy (`--bg:#11295c`) with a soft cyan glow; panels, day cells and posts are light frosted surfaces (`#e8eef6` / `#eef3f9`) with navy text; primary buttons navy `#13306b`, highlights and «today» cyan `#1aa3d4`. Text placed directly on the navy background uses `--on-bg` / `--on-bg-muted`. Not a full dark mode: content surfaces stay light.
 - Every post has a name («اسم المنشور», Ali, 19 Nov 2026): first field in the editor, a heading on the card, shown in the lightbox, and its own Excel column.
 - A post is **not ready** (yellow highlight + reason badges) when it has no name, no image, no design-files link, no caption, no time, or no platform links. If `landing` is filled but short links are missing it shows "بانتظار الاختصار". It turns normal by itself once fixed.
 - Platform short links are collapsed in the editor; the landing (original) URL field is always visible and is **never** exported to Excel.
