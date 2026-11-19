@@ -244,6 +244,31 @@ details.plat{border-top-color:var(--line)}
 .drop-zone,.tp{background:rgba(255,255,255,.45);border-color:var(--line);border-radius:14px}
 .tp-g button{background:rgba(255,255,255,.8);border-color:var(--line);border-radius:10px}
 .tp-g button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.dp{display:grid;gap:10px;border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(255,255,255,.45)}
+.dp-head{font-size:13px;color:var(--muted);font-weight:600}
+.dp-strip{display:grid;grid-template-columns:30px repeat(7,minmax(0,1fr)) 30px;gap:6px}
+.dp-nav{border:1px solid var(--line);background:rgba(255,255,255,.85);border-radius:10px;font-size:16px;color:var(--muted);cursor:pointer;min-height:30px}
+.dp-nav:hover{border-color:var(--accent);color:var(--accent)}
+.dp-day{border:1px solid var(--line);background:rgba(255,255,255,.85);border-radius:14px;padding:7px 2px;display:grid;gap:1px;justify-items:center;cursor:pointer;color:var(--ink)}
+.dp-day:hover{border-color:var(--accent)}
+.dp-day .dn{font-size:11px;color:var(--muted)}
+.dp-day .dx{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.dp-day.today .dx,.dp-mday.today{color:var(--accent)}
+.dp-day.on,.dp-mday.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dp-day.on .dn,.dp-day.on .dx{color:#fff}
+.dp-dots{display:flex;gap:3px;justify-content:center;height:5px}
+.dp-dots i{width:5px;height:5px;border-radius:50%;background:var(--muted);opacity:.6;display:block}
+.dp-dots.full i{background:var(--warn);opacity:1}
+.on .dp-dots i{background:#fff;opacity:.9}
+.dp-foot{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)}
+.dp-link{border:0;background:none;color:var(--accent);font-size:13px;cursor:pointer;padding:0}
+.dp-month{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.dp-mhead{display:grid;grid-template-columns:30px 1fr 30px;align-items:center;text-align:center;font-weight:600;font-size:14px}
+.dp-mgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dp-mgrid .wd{font-size:11px;color:var(--muted);text-align:center}
+.dp-mday{border:1px solid transparent;background:rgba(255,255,255,.7);border-radius:10px;padding:5px 0 4px;display:grid;gap:2px;justify-items:center;font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer;color:var(--ink)}
+.dp-mday:hover{border-color:var(--accent)}
+@media (max-width:520px){.dp-strip{grid-template-columns:24px repeat(7,minmax(0,1fr)) 24px;gap:3px}.dp-day .dn{font-size:9px}.dp-day .dx{font-size:16px}}
 .tp-pre{display:flex;flex-wrap:wrap;gap:8px}
 .tp-chip{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-width:92px;min-height:54px;padding:6px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.85);color:var(--ink);cursor:pointer;line-height:1.3}
 .tp-chip b{font-size:16px;font-variant-numeric:tabular-nums}
@@ -588,7 +613,7 @@ function openEditor(p,dateForNew,isDup){
   root.innerHTML='<div class="overlay"><form class="modal" role="dialog" aria-modal="true" id="ed">'+
    '<header><h2>'+(isDup?'تكرار بوست':isNew?'بوست جديد':'تعديل البوست')+'</h2><button type="button" class="icon-btn" id="edX" aria-label="إغلاق">✕</button></header>'+
    '<div class="content">'+
-    '<div class="field" style="max-width:260px"><label for="fDate">التاريخ</label><input type="date" id="fDate" required value="'+esc(v.date||dateForNew||todayISO)+'"></div>'+
+    '<div class="field"><label>التاريخ <span class="hint" id="dLabel"></span></label><input type="hidden" id="fDate" value="'+esc(v.date||dateForNew||todayISO)+'"><div class="dp" id="dp"></div></div>'+
     '<div class="field"><label>الوقت <span class="hint" id="tLabel"></span></label><div class="tp" id="tp">'+
       '<div class="tp-pre">'+PRESETS.map(([t,l])=>'<button type="button" class="tp-chip" data-p="'+t+'"><b>'+fmtTime(t).replace(/ [صم]$/,"")+'</b><small>'+l+'</small></button>').join("")+
         '<button type="button" class="tp-chip ghost" data-mode="custom"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> وقت ثاني</button>'+
@@ -617,6 +642,38 @@ function openEditor(p,dateForNew,isDup){
   const onKey=e=>{if(e.key==="Escape")close()};
   $("#edX").onclick=close;$("#edCancel").onclick=close;
   document.addEventListener("keydown",onKey);
+
+  // date picker: a week strip with post-count dots, plus an optional month grid
+  const dpS={start:null,month:false,mstart:null};
+  const cntOn=d=>S.posts.filter(x=>x.date===d&&(!p||x.id!==p.id||isDup)).length;
+  const weekStart=d=>addDays(d,-parseISO(d).getUTCDay());
+  const dots=n=>'<span class="dp-dots'+(n>=4?' full':'')+'">'+'<i></i>'.repeat(Math.min(n,4))+'</span>';
+  function setDate(d){$("#fDate").value=d;$("#fDate").dispatchEvent(new Event("change"));drawDate()}
+  function drawDate(){
+    const sel=$("#fDate").value;if(!dpS.start)dpS.start=weekStart(sel);
+    if(!dpS.mstart)dpS.mstart=sel.slice(0,7);
+    const sd=parseISO(dpS.start),ed=parseISO(addDays(dpS.start,6));
+    const range=sd.getUTCMonth()===ed.getUTCMonth()?MONTHS[sd.getUTCMonth()]+" "+sd.getUTCFullYear():MONTHS[sd.getUTCMonth()]+" – "+MONTHS[ed.getUTCMonth()]+" "+ed.getUTCFullYear();
+    let h='<div class="dp-head"><span>'+range+'</span></div><div class="dp-strip"><button type="button" class="dp-nav" data-w="-1" aria-label="الأسبوع اللي قبل">›</button>';
+    for(let i=0;i<7;i++){const d=addDays(dpS.start,i),n=cntOn(d);h+='<button type="button" class="dp-day'+(d===sel?' on':'')+(d===todayISO?' today':'')+'" data-d="'+d+'" aria-pressed="'+(d===sel)+'" aria-label="'+dayName(d)+" "+shortDate(d)+'"><span class="dn">'+dayName(d)+'</span><span class="dx">'+parseISO(d).getUTCDate()+'</span>'+dots(n)+'</button>'}
+    h+='<button type="button" class="dp-nav" data-w="1" aria-label="الأسبوع اللي بعد">‹</button></div>';
+    const n=cntOn(sel);
+    h+='<div class="dp-foot"><span>'+(n?'فيه '+n+' بوست بهاليوم'+(n>=4?' (مليان)':''):'اليوم فاضي')+'</span><button type="button" class="dp-link" id="dpM">'+(dpS.month?'أخفِ تقويم الشهر':'تقويم الشهر')+'</button></div>';
+    if(dpS.month){
+      const [y,m]=dpS.mstart.split("-").map(Number);const first=dpS.mstart+"-01";const lead=parseISO(first).getUTCDay();const dim=new Date(Date.UTC(y,m,0)).getUTCDate();
+      h+='<div class="dp-month"><div class="dp-mhead"><button type="button" class="dp-nav" data-m="-1" aria-label="الشهر اللي قبل">›</button><span>'+MONTHS[m-1]+' '+y+'</span><button type="button" class="dp-nav" data-m="1" aria-label="الشهر اللي بعد">‹</button></div><div class="dp-mgrid">'+DAYS.map(x=>'<span class="wd">'+x.replace("ال","").slice(0,2)+'</span>').join("");
+      for(let i=0;i<lead;i++)h+='<span></span>';
+      for(let i=1;i<=dim;i++){const d=dpS.mstart+"-"+pad(i),c=cntOn(d);h+='<button type="button" class="dp-mday'+(d===sel?' on':'')+(d===todayISO?' today':'')+'" data-d="'+d+'">'+i+dots(c)+'</button>'}
+      h+='</div></div>';
+    }
+    $("#dp").innerHTML=h;
+    $("#dLabel").textContent="· "+dayName(sel)+" "+shortDate(sel);
+    $("#dp").querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{const d=b.dataset.d;if(d<dpS.start||d>addDays(dpS.start,6))dpS.start=weekStart(d);setDate(d)});
+    $("#dp").querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{dpS.start=addDays(dpS.start,7*Number(b.dataset.w));drawDate()});
+    $("#dp").querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{const [yy,mm]=dpS.mstart.split("-").map(Number);const d=new Date(Date.UTC(yy,mm-1+Number(b.dataset.m),1));dpS.mstart=d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1);drawDate()});
+    $("#dpM").onclick=()=>{dpS.month=!dpS.month;dpS.mstart=$("#fDate").value.slice(0,7);drawDate()};
+  }
+  drawDate();
 
   // time picker: usual posting times as one-tap presets, rare times in a compact row
   const ts={mode:"none",preset:"",h:4,m:"30",a:"pm",touched:false};
