@@ -12,6 +12,7 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
   - The site asks once per browser «مين أنت؟» (محمد / علي), keeps it in localStorage, and sends it as the `x-actor` header; the activity trigger records it as the actor.
   - realtime is on for `posts`, so open pages refresh by themselves.
   - table `public.dictionary` — shared spelling whitelist (`word`).
+  - In the trigger, add field names with `array_append(ch, 'x'::text)`, never `ch || 'x'`: Postgres reads `'x'` as an array literal and every edit fails with «malformed array literal» (bug found 19 Nov 2026, fixed in `supabase/title.sql`).
   - table `public.activity` — change log filled by the `posts_activity` trigger (who did what to which post). Kept 90 days. See `supabase/activity.sql`.
   - schema lives in `supabase/schema.sql`.
 - Libraries come from CDNs (supabase-js, ExcelJS, JSZip). Pin exact versions.

@@ -42,15 +42,15 @@ begin
     act := 'delete'; lbl := post_label(old);
     det := jsonb_build_object('date', old.date, 'time', old.time);
   else
-    if new.date is distinct from old.date then ch := ch || 'date'; end if;
-    if new.time is distinct from old.time then ch := ch || 'time'; end if;
-    if new.caption is distinct from old.caption then ch := ch || 'caption'; end if;
-    if new.media is distinct from old.media then ch := ch || 'media'; end if;
-    if new.design is distinct from old.design then ch := ch || 'design'; end if;
-    if new.animation is distinct from old.animation then ch := ch || 'animation'; end if;
-    if new.links is distinct from old.links then ch := ch || 'links'; end if;
-    if new.landing is distinct from old.landing then ch := ch || 'landing'; end if;
-    if new.note is distinct from old.note then ch := ch || 'note'; end if;
+    if new.date is distinct from old.date then ch := array_append(ch, 'date'::text); end if;
+    if new.time is distinct from old.time then ch := array_append(ch, 'time'::text); end if;
+    if new.caption is distinct from old.caption then ch := array_append(ch, 'caption'::text); end if;
+    if new.media is distinct from old.media then ch := array_append(ch, 'media'::text); end if;
+    if new.design is distinct from old.design then ch := array_append(ch, 'design'::text); end if;
+    if new.animation is distinct from old.animation then ch := array_append(ch, 'animation'::text); end if;
+    if new.links is distinct from old.links then ch := array_append(ch, 'links'::text); end if;
+    if new.landing is distinct from old.landing then ch := array_append(ch, 'landing'::text); end if;
+    if new.note is distinct from old.note then ch := array_append(ch, 'note'::text); end if;
     if coalesce(array_length(ch, 1), 0) = 0 then return new; end if;
     act := case when ch = array['date'] then 'move' else 'update' end;
     lbl := post_label(new);
