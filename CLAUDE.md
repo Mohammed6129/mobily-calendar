@@ -17,7 +17,7 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
 - Libraries come from CDNs (supabase-js, ExcelJS, JSZip). Pin exact versions.
 
 ## Product rules (agreed with Mohammed)
-- UI is Arabic, RTL, Saudi dialect, frosted-glass surfaces on a soft light-grey background (`--bg:#e3e5e9`) with muted, non-glaring colors (accent `#2f5f9c`). Avoid bright white surfaces and saturated colors. No dark mode.
+- UI is Arabic, RTL, Saudi dialect, frosted-glass surfaces on a calm mid-light grey background (`--bg:#d3d6dc`, surfaces `#e1e4e8`) with muted, non-glaring colors (accent `#2a5288`) — easy on the eyes. Avoid bright white surfaces and saturated colors. No dark mode.
 - A post is **not ready** (yellow highlight + reason badges) when it has no image, no design-files link, no caption, no time, or no platform links. If `landing` is filled but short links are missing it shows "بانتظار الاختصار". It turns normal by itself once fixed.
 - Platform short links are collapsed in the editor; the landing (original) URL field is always visible and is **never** exported to Excel.
 - Time picker: one-tap presets 11:00 / 15:00 / 19:00 (marked «محجوز» if another post that day uses it; new posts auto-pick the first free one), plus «وقت ثاني» (hour select, minutes 00/15/30/45, AM ☀ / PM ☾) and «بدون وقت».
