@@ -340,6 +340,13 @@ body.feed-off .feed-btn{display:inline-flex}
 .mp-tools .del:hover{background:rgba(168,50,43,.1);color:var(--danger)}
 .dupb{position:absolute;top:2px;left:2px;z-index:1;font-size:10px;font-weight:800;line-height:1;padding:2px 4px;border-radius:5px;background:#3b3f73;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em}
 .dupb.static{position:static;display:inline-block;vertical-align:2px;margin-inline-start:4px}
+.drag-ghost{position:fixed;left:0;top:0;z-index:60;pointer-events:none;box-shadow:0 14px 34px rgba(15,29,58,.28);opacity:.95}
+body.dragging-any{cursor:grabbing;user-select:none;-webkit-user-select:none}
+.mp{cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.mp.lift{transform:scale(1.03);box-shadow:0 8px 20px rgba(15,29,58,.18)}
+.layout{padding:0 clamp(16px,3.2vw,44px)}
+.top-in{padding-inline:clamp(16px,3.2vw,44px)}
+main{padding-bottom:60px}
 /* post preview */
 .pv{position:fixed;z-index:45;width:min(340px,92vw);max-height:min(640px,calc(100vh - 16px));display:flex;flex-direction:column;background:var(--glass-strong);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-border);border-radius:18px;box-shadow:0 12px 40px rgba(20,25,35,.22);overflow:hidden}
 .pv.sheet{left:0;right:0;bottom:0;width:auto;max-height:82vh;border-radius:18px 18px 0 0}
@@ -767,18 +774,56 @@ function miniPost(p){
     '<div class="mp-tools"><button type="button" data-a="eye" title="معاينة" aria-label="معاينة">'+IC.eye+'</button>'+
     (S.canEdit?'<button type="button" data-a="edit" title="تعديل" aria-label="تعديل">'+IC.edit+'</button><button type="button" data-a="dup" title="تكرار" aria-label="تكرار">'+IC.dup+'</button><button type="button" data-a="del" class="del" title="حذف" aria-label="حذف">'+IC.del+'</button>':'')+'</div>';
   const pv=()=>openPreview(p,el);
-  el.onclick=e=>{if(e.target.closest("button"))return;pv()};
+  el.onclick=e=>{if(e.target.closest("button")||el.__dragged)return;pv()};
   el.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();pv()}};
   el.querySelector('[data-a="eye"]').onclick=pv;
   if(S.canEdit){
     el.querySelector('[data-a="edit"]').onclick=()=>{closePreview();openEditor(p)};
     el.querySelector('[data-a="dup"]').onclick=()=>{closePreview();openEditor(Object.assign({},p,{id:null}),null,true)};
     el.querySelector('[data-a="del"]').onclick=()=>{closePreview();confirmDelete(p)};
-    el.draggable=true;
-    el.addEventListener("dragstart",e=>{closePreview();S.dragId=p.id;el.classList.add("dragging");e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",p.id)}catch(_){}});
-    el.addEventListener("dragend",()=>{S.dragId=null;el.classList.remove("dragging")});
+    pointerDrag(el,p);
   }
   return el;
+}
+// drag a post to another day with mouse, trackpad or finger (long-press on touch); works in every browser
+function pointerDrag(el,p){
+  el.querySelectorAll("img,video").forEach(m=>m.setAttribute("draggable","false"));
+  let armed=false;
+  el.addEventListener("touchmove",e=>{if(armed)e.preventDefault()},{passive:false});
+  el.addEventListener("pointerdown",e=>{
+    if(e.button!==0||e.target.closest("button"))return;
+    const sx=e.clientX,sy=e.clientY,touch=e.pointerType!=="mouse";
+    let started=false,ghost=null,over=null,timer=null,lastY=sy;armed=!touch;
+    if(touch)timer=setTimeout(()=>{armed=true;el.classList.add("lift");try{navigator.vibrate&&navigator.vibrate(12)}catch(_){}},300);
+    const findCell=(x,y)=>{if(ghost)ghost.style.display="none";const t=document.elementFromPoint(x,y);if(ghost)ghost.style.display="";return t&&t.closest(".dc")};
+    const move=ev=>{
+      const dx=ev.clientX-sx,dy=ev.clientY-sy;
+      if(!started){
+        if(!armed){if(Math.hypot(dx,dy)>8)done();return}
+        if(Math.hypot(dx,dy)<6)return;
+        started=true;closePreview();el.classList.add("dragging");
+        ghost=el.cloneNode(true);ghost.className="mp drag-ghost";ghost.style.width=el.offsetWidth+"px";document.body.appendChild(ghost);
+        document.body.classList.add("dragging-any");
+      }
+      ev.preventDefault();lastY=ev.clientY;
+      ghost.style.transform="translate("+(ev.clientX-ghost.offsetWidth/2)+"px,"+(ev.clientY-24)+"px) rotate(-2deg)";
+      const c=findCell(ev.clientX,ev.clientY);
+      if(c!==over){over&&over.classList.remove("drop");over=c;over&&over.classList.add("drop")}
+    };
+    const scroller=setInterval(()=>{if(!started)return;if(lastY<90)scrollBy(0,-14);else if(lastY>innerHeight-70)scrollBy(0,14)},30);
+    const up=()=>{
+      done();
+      if(started){
+        el.classList.remove("dragging");ghost&&ghost.remove();document.body.classList.remove("dragging-any");
+        over&&over.classList.remove("drop");
+        const d=over&&over.id&&over.id.slice(2);
+        if(d&&d!==p.date)movePost(p.id,d);
+        el.__dragged=true;setTimeout(()=>{el.__dragged=false},60);
+      }
+    };
+    function done(){clearTimeout(timer);clearInterval(scroller);armed=false;el.classList.remove("lift");removeEventListener("pointermove",move);removeEventListener("pointerup",up);removeEventListener("pointercancel",up)}
+    addEventListener("pointermove",move,{passive:false});addEventListener("pointerup",up);addEventListener("pointercancel",up);
+  });
 }
 let PV=null;
 function closePreview(){if(PV){PV.el.remove();document.removeEventListener("mousedown",PV.out,true);document.removeEventListener("keydown",PV.key);PV.anchor&&PV.anchor.classList.remove("pv-on");PV=null}}
