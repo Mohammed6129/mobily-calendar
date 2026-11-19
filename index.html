@@ -1016,7 +1016,7 @@ function dayTitle(k){const t=todayISO,y=(()=>{const d=new Date();d.setDate(d.get
 async function loadActivity(){const {data,error}=await sb.from("activity").select("*").order("at",{ascending:false}).limit(150);if(!error){FEED.acts=data||[];renderFeed()}}
 async function loadCommits(){
   try{const r=await fetch("https://api.github.com/repos/"+GH_REPO+"/commits?per_page=40",{cache:"no-store"});if(!r.ok)return;
-    const j=await r.json();FEED.commits=j.map(c=>({at:c.commit.author.date,login:c.author&&c.author.login,msg:String(c.commit.message||"").split("\n")[0],url:c.html_url}));renderFeed()}catch(e){}
+    const j=await r.json();FEED.commits=j.map(c=>({at:c.commit.author.date,login:(c.author&&c.author.login)||(c.commit.author&&c.commit.author.name)||"",msg:String(c.commit.message||"").split("\n")[0],url:c.html_url}));renderFeed()}catch(e){}
 }
 function feedItems(){
   const items=[];
