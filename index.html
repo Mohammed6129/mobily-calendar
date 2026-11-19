@@ -560,7 +560,30 @@ function guessName(cap){
   return "";
 }
 /* the name to show: the saved name, or the bundle/product read from the caption */
-function nameOf(p){return postTitle(p)||guessName(p&&p.caption)}
+function nameOf(p){return postTitle(p)||guessName(p&&p.caption)||nameFromLinks(p&&p.links)}
+/* fallback: the short-link base, e.g. mobily.im/PrepaidWeeklyPlusX → Prepaid Weekly Plus */
+function nameFromLinks(l){
+  if(!l)return "";
+  const u=Object.keys(l).filter(k=>k!=="_title").map(k=>String(l[k]||"").split(/\s+/)[0]).find(Boolean);if(!u)return "";
+  const b=u.replace(/^https?:\/\/[^/]+\//,"").replace(/[?#].*$/,"").replace(/(ARSMS|ENSMS|ARPN|ENPN|X|IG|FB|TT|SC)$/,"");
+  return b.replace(/([a-z])([A-Z])/g,"$1 $2").replace(/([a-z])(\d)/g,"$1 $2").trim();
+}
+/* last resort: read the design itself (OCR in the browser, Arabic + English) */
+function loadTesseract(){
+  if(window.Tesseract)return Promise.resolve();
+  return new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});
+}
+async function nameFromImage(url){
+  await loadTesseract();
+  const {data}=await Tesseract.recognize(url,"ara+eng",{langPath:"https://tessdata.projectnaptha.com/4.0.0_fast"});
+  const fromText=guessName(data.text||"");if(fromText)return fromText;
+  // otherwise the biggest clear line on the design, preferring Latin product names
+  const lines=(data.lines||[]).map(l=>({t:String(l.text||"").replace(/\s+/g," ").trim(),h:l.bbox.y1-l.bbox.y0,c:l.confidence})).filter(l=>l.t.length>=3&&l.c>=60);
+  const latin=lines.filter(l=>/[A-Za-z]{2,}/.test(l.t)&&!/mobily|\.com|\.sa|www/i.test(l.t)).sort((a,b)=>b.h-a.h);
+  if(latin.length)return latin[0].t.replace(/[^A-Za-z0-9+ ]/g,"").replace(/\s+/g," ").trim();
+  const ar=lines.filter(l=>/[؀-ۿ]{3,}/.test(l.t)).sort((a,b)=>b.h-a.h);
+  return ar.length?ar[0].t.replace(/[^؀-ۿ0-9A-Za-z+ ]/g,"").trim():"";
+}
 function withTitle(data,t){t=String(t||"").trim();const links=Object.assign({},data.links||{});delete links._title;
   if(S.hasTitle)return Object.assign(data,{title:t,links});if(t)links._title=t;return Object.assign(data,{links})}
 function missing(p){
@@ -959,13 +982,14 @@ function confirmDelete(p){
 /* ---------- editor ---------- */
 function openEditor(p,dateForNew,isDup){
   const isNew=!p||!p.id;
+  S.afterMedia=null;
   const st={media:(p&&p.media?p.media.slice():[]),uploading:0};
   const root=$("#modalRoot");
   const v=p||{};
   root.innerHTML='<div class="overlay"><form class="modal" role="dialog" aria-modal="true" id="ed">'+
    '<header><h2>'+(isDup?'تكرار بوست':isNew?'بوست جديد':'تعديل البوست')+'</h2><button type="button" class="icon-btn" id="edX" aria-label="إغلاق">✕</button></header>'+
    '<div class="content">'+
-    '<div class="field"><label for="fTitle">اسم المنشور</label><input type="text" id="fTitle" maxlength="80" value="'+esc(nameOf(v))+'" placeholder="اسم الباقة أو المنتج، مثلًا: AirPods 5 أو باقة 100GB"></div>'+
+    '<div class="field"><label for="fTitle">اسم المنشور</label><input type="text" id="fTitle" maxlength="80" value="'+esc(nameOf(v))+'" placeholder="اسم الباقة أو المنتج، مثلًا: AirPods 5 أو باقة 100GB"><span class="hint" id="tHint"></span></div>'+
     '<div class="field"><label>التاريخ <span class="hint" id="dLabel"></span></label><input type="hidden" id="fDate" value="'+esc(v.date||dateForNew||todayISO)+'"><div class="dp" id="dp"></div></div>'+
     '<div class="field"><label>الوقت <span class="hint" id="tLabel"></span></label><div class="tp" id="tp">'+
       '<div class="tp-pre">'+PRESETS.map(([t,l])=>'<button type="button" class="tp-chip" data-p="'+t+'"><b>'+fmtTime(t).replace(/ [صم]$/,"")+'</b><small>'+l+'</small></button>').join("")+
@@ -1060,6 +1084,7 @@ function openEditor(p,dateForNew,isDup){
   drawTime();
 
   const drawMedia=()=>{
+    if(S.afterMedia)setTimeout(S.afterMedia,0);
     const ml=$("#mlist");ml.innerHTML="";
     st.media.forEach((m,i)=>{
       const it=document.createElement("div");it.className="mitem";
@@ -1093,9 +1118,20 @@ function openEditor(p,dateForNew,isDup){
       st.uploading--;drawMedia();
     }
   }
-  {const fT=$("#fTitle"),fC=$("#fCap");let auto=!postTitle(v);
-   fT.addEventListener("input",()=>{auto=!fT.value.trim()});
-   fC.addEventListener("input",()=>{if(auto)fT.value=guessName(fC.value)});}
+  {const fT=$("#fTitle"),fC=$("#fCap"),hint=$("#tHint");let auto=!postTitle(v),ocrFor="";
+   const src=()=>{const c=guessName(fC.value);if(c)return [c,"من الكابشن"];const l=nameFromLinks(v.links);if(l)return [l,"من الروابط المختصرة"];return ["",""]};
+   const tryImage=async()=>{
+     const m=st.media.find(x=>!isVideo(x));if(!auto||!m||ocrFor===m.path||fT.value.trim())return;
+     ocrFor=m.path;hint.textContent="أقرا التصميم عشان أطلع الاسم…";
+     try{const n=await nameFromImage(mediaUrl(m)||(await signPaths([m.path]),mediaUrl(m)));if(auto&&!fT.value.trim()&&n){fT.value=n;hint.textContent="اقترحناه من التصميم، عدّله إذا تبي"}else if(!fT.value.trim())hint.textContent=""}
+     catch(e){hint.textContent=""}
+   };
+   const refresh=()=>{if(!auto)return;const [n,why]=src();fT.value=n;hint.textContent=n?("اقترحناه "+why+"، عدّله إذا تبي"):"";if(!n)tryImage()};
+   if(auto&&fT.value.trim()){const [,why]=src();hint.textContent=why?("اقترحناه "+why+"، عدّله إذا تبي"):""}
+   fT.addEventListener("input",()=>{auto=!fT.value.trim();hint.textContent=""});
+   fC.addEventListener("input",refresh);
+   S.afterMedia=()=>{if(auto&&!fT.value.trim())tryImage()};
+   if(auto&&!fT.value.trim())setTimeout(tryImage,300);}
   $("#fFile").onchange=e=>{upload(e.target.files);e.target.value=""};
   const dz=$("#dz");
   dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("over")});
