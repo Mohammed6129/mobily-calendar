@@ -10,6 +10,7 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
   - private storage bucket `media`; the app shows files through signed URLs
   - RLS: only signed-in users can read/write. Sign-ups are disabled; people are invited from Supabase → Authentication → Users.
   - realtime is on for `posts`, so open pages refresh by themselves.
+  - table `public.dictionary` — shared spelling whitelist (`word`).
   - schema lives in `supabase/schema.sql`.
 - Libraries come from CDNs (supabase-js, ExcelJS, JSZip). Pin exact versions.
 
@@ -20,6 +21,7 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
 - Time picker: hour boxes 1–12 in a 4×3 grid, minutes 00/15/30/45 only, AM/PM, or "no time".
 - Excel export keeps the team's sheet layout (Date / Time / Visual / Caption / Design / Animation / Platform / Landing Page), with an option to keep only the Snapchat link. Excel import reads the same layout.
 - No approval buttons; the site is only for the two editors.
+- Caption spelling review uses the public LanguageTool API (Arabic). It only flags issues and suggestions, it never edits the caption. Words marked "مو غلط" go into the shared `public.dictionary` table and are skipped next time.
 
 ## Working on it
 - Edit `index.html`, test locally with any static server, commit to `main`, push. Vercel deploys in ~10 s.

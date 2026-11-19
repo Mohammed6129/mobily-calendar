@@ -244,6 +244,16 @@ details.plat{border-top-color:var(--line)}
 .drop-zone,.tp{background:rgba(255,255,255,.45);border-color:var(--line);border-radius:14px}
 .tp-g button{background:rgba(255,255,255,.8);border-color:var(--line);border-radius:10px}
 .tp-g button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.sp-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sp-btn{font-size:13px;padding:5px 12px}
+.sp-list{display:grid;gap:6px}
+.sp-list.stale{opacity:.5}
+.sp-item{border:1px solid rgba(227,0,0,.18);background:rgba(255,235,235,.6);border-radius:12px;padding:8px 10px;display:grid;gap:4px}
+.sp-ctx{font-size:13px;color:var(--muted);white-space:pre-line}
+.sp-ctx mark{background:none;color:var(--danger);text-decoration:underline wavy var(--danger);text-underline-offset:4px;font-weight:600}
+.sp-row{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:13px}
+.sp-sug b{font-weight:700}
+.sp-ok{border:1px solid var(--line);background:rgba(255,255,255,.85);border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
 .dp{display:grid;gap:10px;border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(255,255,255,.45)}
 .dp-head{font-size:13px;color:var(--muted);font-weight:600}
 .dp-strip{display:grid;grid-template-columns:30px repeat(7,minmax(0,1fr)) 30px;gap:6px}
@@ -627,7 +637,8 @@ function openEditor(p,dateForNew,isDup){
     '<div class="field"><label>التصميم</label><div class="drop-zone" id="dz"><div class="mlist" id="mlist"></div>'+
       '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label class="btn" for="fFile" style="cursor:pointer">ارفع صور أو فيديو</label><input type="file" id="fFile" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" multiple class="hidden">'+
       '<span class="hint">أو اسحبها هنا، أو الصق صورة بـ Ctrl+V</span></div><span class="hint" id="upMsg"></span></div></div>'+
-    '<div class="field"><label for="fCap">الكابشن</label><textarea id="fCap" placeholder="الصق الكابشن هنا">'+esc(v.caption||"")+'</textarea></div>'+
+    '<div class="field"><label for="fCap">الكابشن</label><textarea id="fCap" placeholder="الصق الكابشن هنا">'+esc(v.caption||"")+'</textarea>'+
+      '<div class="sp-bar"><button type="button" class="btn sp-btn" id="spBtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16l4-10 4 10"/><path d="M5.5 12.5h5"/><path d="M14 17l2.5 2.5L21 14"/></svg> مراجعة إملائية</button><span class="hint" id="spMsg"></span></div><div class="sp-list" id="spList"></div></div>'+
     '<div class="row2"><div class="field"><label for="fDesign">رابط ملفات التصميم</label><input type="url" id="fDesign" placeholder="https://drive.google.com/…" value="'+esc(v.design||"")+'"></div>'+
     '<div class="field"><label for="fAnim">رابط الأنيميشن</label><input type="url" id="fAnim" placeholder="https://…" value="'+esc(v.animation||"")+'"></div></div>'+
     '<div class="field"><label for="fLanding">ضع الرابط الأصلي في حال لا يوجد اختصار</label><input type="url" id="fLanding" placeholder="https://www.mobily.com.sa/…" value="'+esc(v.landing||"")+'"><span class="hint" id="landHint">يصير البوست «بانتظار الاختصار» لين تنضاف الروابط المختصرة. هذا الرابط ما يطلع في ملف الإكسل.</span></div>'+
@@ -674,6 +685,7 @@ function openEditor(p,dateForNew,isDup){
     $("#dpM").onclick=()=>{dpS.month=!dpS.month;dpS.mstart=$("#fDate").value.slice(0,7);drawDate()};
   }
   drawDate();
+  wireSpelling();
 
   // time picker: usual posting times as one-tap presets, rare times in a compact row
   const ts={mode:"none",preset:"",h:4,m:"30",a:"pm",touched:false};
@@ -904,6 +916,50 @@ async function buildXlsx(posts,snapOnly){
   return {buf,name};
 }
 
+
+
+/* ---------- spelling review (flags only, never changes the text) ---------- */
+let DICT=null;
+async function loadDict(){if(DICT)return DICT;const {data}=await sb.from("dictionary").select("word");DICT=new Set((data||[]).map(r=>normWord(r.word)));return DICT}
+function normWord(w){return String(w||"").trim().replace(/[ً-ْـ]/g,"")}
+async function checkSpelling(text){
+  const body=new URLSearchParams({text,language:"ar",enabledOnly:"false"});
+  const r=await fetch("https://api.languagetool.org/v2/check",{method:"POST",body});
+  if(!r.ok)throw new Error(r.status===429?"كثرت المراجعات، انتظر دقيقة":"خدمة المراجعة ما ردّت");
+  const j=await r.json();const dict=await loadDict();
+  return (j.matches||[]).map(m=>({word:text.substr(m.offset,m.length),offset:m.offset,length:m.length,msg:m.message,reps:(m.replacements||[]).slice(0,3).map(x=>x.value),typo:m.rule&&m.rule.category&&m.rule.category.id==="TYPOS"}))
+    .filter(x=>x.word.trim()&&!/^[\sA-Za-z0-9.,:;!?%+\-\/@#_&()'"|]+$/.test(x.word)&&!x.word.split(/\s+/).every(w=>dict.has(normWord(w))));
+}
+function wireSpelling(){
+  const ta=$("#fCap"),list=$("#spList"),msg=$("#spMsg"),btn=$("#spBtn");let checked="";
+  ta.addEventListener("input",()=>{if(checked&&ta.value!==checked){msg.textContent="تغيّر الكابشن، راجع مرة ثانية";list.classList.add("stale")}});
+  btn.onclick=async()=>{
+    const text=ta.value;if(!text.trim()){msg.textContent="الكابشن فاضي";return}
+    btn.disabled=true;msg.textContent="جاري المراجعة…";list.innerHTML="";list.classList.remove("stale");
+    try{
+      const issues=await checkSpelling(text);checked=text;
+      msg.textContent=issues.length?("لقيت "+issues.length+" ملاحظة. ما غيّرت شي في النص"):"ما لقيت أخطاء إملائية";
+      list.innerHTML=issues.map((x,i)=>{
+        const before=text.slice(Math.max(0,x.offset-18),x.offset),after=text.slice(x.offset+x.length,x.offset+x.length+18);
+        return '<div class="sp-item" data-i="'+i+'"><div class="sp-ctx">…'+esc(before)+'<mark>'+esc(x.word)+'</mark>'+esc(after)+'…</div>'+
+          '<div class="sp-row"><span class="sp-sug">'+(x.reps.length?'يمكن تقصد: '+x.reps.map(r=>'<b>'+esc(r)+'</b>').join("، "):esc(x.msg))+'</span>'+
+          '<button type="button" class="sp-ok" data-w="'+esc(x.word)+'">مو غلط</button></div></div>';
+      }).join("");
+      list.querySelectorAll(".sp-ok").forEach(b=>b.onclick=async()=>{
+        const words=b.dataset.w.split(/\s+/).map(normWord).filter(Boolean);
+        b.disabled=true;
+        const {error}=await sb.from("dictionary").upsert(words.map(word=>({word})));
+        if(error){b.disabled=false;toast("ما انحفظت الكلمة");return}
+        words.forEach(w=>DICT&&DICT.add(w));
+        const it=b.closest(".sp-item");it.remove();
+        const left=list.querySelectorAll(".sp-item").length;
+        msg.textContent=left?("باقي "+left+" ملاحظة"):"تمام، ما باقي ملاحظات";
+        toast("انضافت للقاموس، ما راح تنبّه عليها مرة ثانية");
+      });
+    }catch(e){msg.textContent=e.message||"ما قدرت أراجع الحين"}
+    btn.disabled=false;
+  };
+}
 
 /* ---------- import a calendar Excel (same layout as the team's sheet) ---------- */
 const MON_IDX={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};

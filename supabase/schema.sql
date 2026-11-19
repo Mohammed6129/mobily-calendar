@@ -27,3 +27,12 @@ create policy "team media write" on storage.objects for all to authenticated usi
 do $$ begin
   alter publication supabase_realtime add table public.posts;
 exception when duplicate_object then null; end $$;
+
+-- shared spelling dictionary (words the team marked as correct)
+create table if not exists public.dictionary (
+  word text primary key,
+  added_at timestamptz not null default now()
+);
+alter table public.dictionary enable row level security;
+drop policy if exists "team dictionary" on public.dictionary;
+create policy "team dictionary" on public.dictionary for all to authenticated using (true) with check (true);
