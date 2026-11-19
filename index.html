@@ -565,8 +565,16 @@ function nameOf(p){return postTitle(p)||guessName(p&&p.caption)||nameFromLinks(p
 function nameFromLinks(l){
   if(!l)return "";
   const u=Object.keys(l).filter(k=>k!=="_title").map(k=>String(l[k]||"").split(/\s+/)[0]).find(Boolean);if(!u)return "";
-  const b=u.replace(/^https?:\/\/[^/]+\//,"").replace(/[?#].*$/,"").replace(/(ARSMS|ENSMS|ARPN|ENPN|X|IG|FB|TT|SC)$/,"");
-  return b.replace(/([a-z])([A-Z])/g,"$1 $2").replace(/([a-z])(\d)/g,"$1 $2").trim();
+  const b=u.replace(/^https?:\/\/[^/]+\//,"").replace(/[?#].*$/,"").replace(/(ARSMS|ENSMS|ARPN|ENPN|X|IG|FB|TT|SC)$/,"").replace(/AR$|EN$/,"");
+  let m;
+  if(m=b.match(/^Home5G\D*(\d+)?/i))return "موبايلي هوم 5G"+(m[1]?" "+m[1]+" ميجا":"");
+  if(m=b.match(/^FTTH(\d+)?/i))return "هوم فايبر"+(m[1]?" "+m[1]+" ميجا":"");
+  if(m=b.match(/Shamel(Max|Start)/i))return "باقة شامل "+(/max/i.test(m[1])?"ماكس":"ستارت");
+  if(/Shamel/i.test(b))return "باقات مفوتر شامل";
+  if(/WeeklyPlus/i.test(b))return "الباقة الأسبوعية بلس";
+  if(m=b.match(/^Prepaid(\d+)/i))return "باقة مسبق الدفع "+m[1];
+  if(/^DataBundles/i.test(b))return "باقات بيانات مسبق الدفع";
+  return b.replace(/([a-z])([A-Z])/g,"$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g,"$1 $2").replace(/([a-z])(\d)/g,"$1 $2").replace(/\bi (Phone|Pad|Cloud|Mac)/g,"i$1").replace(/\bAir (Pods|Tag)/g,"Air$1").replace(/\bMac Book/g,"MacBook").trim();
 }
 /* last resort: read the design itself (OCR in the browser, Arabic + English) */
 function loadTesseract(){
@@ -576,13 +584,10 @@ function loadTesseract(){
 async function nameFromImage(url){
   await loadTesseract();
   const {data}=await Tesseract.recognize(url,"ara+eng",{langPath:"https://tessdata.projectnaptha.com/4.0.0_fast"});
-  const fromText=guessName(data.text||"");if(fromText)return fromText;
-  // otherwise the biggest clear line on the design, preferring Latin product names
-  const lines=(data.lines||[]).map(l=>({t:String(l.text||"").replace(/\s+/g," ").trim(),h:l.bbox.y1-l.bbox.y0,c:l.confidence})).filter(l=>l.t.length>=3&&l.c>=60);
-  const latin=lines.filter(l=>/[A-Za-z]{2,}/.test(l.t)&&!/mobily|\.com|\.sa|www/i.test(l.t)).sort((a,b)=>b.h-a.h);
-  if(latin.length)return latin[0].t.replace(/[^A-Za-z0-9+ ]/g,"").replace(/\s+/g," ").trim();
-  const ar=lines.filter(l=>/[؀-ۿ]{3,}/.test(l.t)).sort((a,b)=>b.h-a.h);
-  return ar.length?ar[0].t.replace(/[^؀-ۿ0-9A-Za-z+ ]/g,"").trim():"";
+  // only trust clearly-read lines, and only accept a real bundle/product name; stylized ads often read as noise
+  const clear=(data.lines||[]).filter(l=>l.confidence>=80).map(l=>String(l.text||"").replace(/\s+/g," ").trim()).join(" ");
+  const n=guessName(clear);
+  return /[A-Za-z]{3,}|[\u0600-\u06FF]{3,}/.test(n)?n:"";
 }
 function withTitle(data,t){t=String(t||"").trim();const links=Object.assign({},data.links||{});delete links._title;
   if(S.hasTitle)return Object.assign(data,{title:t,links});if(t)links._title=t;return Object.assign(data,{links})}
