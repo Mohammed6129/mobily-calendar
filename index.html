@@ -618,9 +618,24 @@ async function loadPosts(first){
   if(first&&S.ym===todayISO.slice(0,7))S.pendingScroll=todayISO;
   render();
 }
+/* Save changes to an existing post. Until supabase/title.sql runs, the database's activity
+   trigger rejects every UPDATE with 22P02 «malformed array literal». Then we save the post as a
+   fresh row and remove the old one, so moving and editing keep working. */
+const POST_COLS=["date","time","caption","media","design","animation","links","landing","note","title","updated_at"];
+async function updatePost(id,changes){
+  const r=await sb.from("posts").update(changes).eq("id",id);
+  if(!r.error||r.error.code!=="22P02")return r;
+  const old=S.posts.find(x=>x.id===id);if(!old)return r;
+  const row={};POST_COLS.forEach(k=>{if(k in old)row[k]=old[k]});Object.assign(row,changes);
+  if(!S.hasTitle)delete row.title;
+  const ins=await sb.from("posts").insert(row).select("id").single();if(ins.error)return ins;
+  const del=await sb.from("posts").delete().eq("id",id);
+  if(del.error){await sb.from("posts").delete().eq("id",ins.data.id);return del}
+  return {error:null,newId:ins.data.id};
+}
 async function movePost(id,newDate){
   const p=S.posts.find(x=>x.id===id);if(!p||p.date===newDate)return;
-  try{const {error}=await sb.from("posts").update({date:newDate,updated_at:new Date().toISOString()}).eq("id",id);if(error)throw error;p.date=newDate;render();toast("انتقل البوست إلى "+dayName(newDate)+" "+shortDate(newDate))}
+  try{const res=await updatePost(id,{date:newDate,updated_at:new Date().toISOString()});if(res.error)throw res.error;p.date=newDate;if(res.newId)p.id=res.newId;render();toast("انتقل البوست إلى "+dayName(newDate)+" "+shortDate(newDate))}
   catch(e){toast("ما انحفظ النقل، جرّب مرة ثانية")}
 }
 async function deletePost(id){
@@ -1102,7 +1117,7 @@ function openEditor(p,dateForNew,isDup){
     if(!data.date){$("#edMsg").textContent="حدد التاريخ";return}
     $("#edSave").disabled=true;$("#edMsg").textContent="جاري الحفظ…";
     try{
-      const res=isNew?await sb.from("posts").insert(data):await sb.from("posts").update(data).eq("id",p.id);
+      const res=isNew?await sb.from("posts").insert(data):await updatePost(p.id,data);
       if(res.error)throw res.error;
       await loadPosts(false);
       close();toast(isNew?"انضاف البوست":"انحفظ التعديل");
