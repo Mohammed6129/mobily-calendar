@@ -899,6 +899,8 @@ function openExport(){
     }
   };
 }
+/* Excel export always uses Mobily's brand fonts (Ali, 19 Nov 2026) */
+const XF_HEAD="Mobily_Headline_v7",XF_TEXT="Mobily_Text_v7";
 async function buildXlsx(posts,snapOnly,full){
   await loadExcelJS();
   const wb=new ExcelJS.Workbook();
@@ -911,10 +913,10 @@ async function buildXlsx(posts,snapOnly,full){
   const range=full?EN_MON[d0.getUTCMonth()]+" 1 – "+d1.getUTCDate()+", "+d1.getUTCFullYear():EN_MON[d0.getUTCMonth()]+" "+d0.getUTCDate()+(ps[0].date===ps[ps.length-1].date?"":" – "+(d0.getUTCMonth()===d1.getUTCMonth()?"":EN_MON[d1.getUTCMonth()]+" ")+d1.getUTCDate())+", "+d1.getUTCFullYear();
   ws.mergeCells("A1:H1");
   const t=ws.getCell("A1");t.value="Mobily Consumer Calendar  ·  "+range;
-  t.font={name:"Arial",size:18,bold:true,color:{argb:"FFFFFFFF"}};t.fill=fill("FF0E61FE");t.alignment={vertical:"middle",indent:1};
+  t.font={name:XF_HEAD,size:18,bold:true,color:{argb:"FFFFFFFF"}};t.fill=fill("FF0E61FE");t.alignment={vertical:"middle",indent:1};
   ws.getRow(1).height=36;ws.getRow(2).height=6;
   ["Date","Time","Visual","Caption","Design","Animation","Platform","Landing Page"].forEach((h,i)=>{
-    const c=ws.getRow(3).getCell(i+1);c.value=h;c.font={name:"Arial",size:11,bold:true,color:{argb:"FFFFFFFF"}};
+    const c=ws.getRow(3).getCell(i+1);c.value=h;c.font={name:XF_HEAD,size:11,bold:true,color:{argb:"FFFFFFFF"}};
     c.fill=fill("FF0A1A4A");c.alignment={horizontal:"center",vertical:"middle"};
   });
   ws.getRow(3).height=26;
@@ -933,7 +935,7 @@ async function buildXlsx(posts,snapOnly,full){
         for(let i=0;i<per;i++){
           const row=ws.getRow(r+i);row.height=rowH;
           for(let c=2;c<=8;c++){const cell=row.getCell(c);cell.fill=fill(base);cell.border={top:LINE,bottom:LINE,left:LINE,right:LINE};cell.alignment={horizontal:"center",vertical:"middle",wrapText:true};}
-          const g=row.getCell(7);g.value=plats[i][1];g.font={name:"Arial",size:10,bold:true,color:{argb:PLAT_COLOR[plats[i][0]]}};
+          const g=row.getCell(7);g.value=plats[i][1];g.font={name:XF_HEAD,size:10,bold:true,color:{argb:PLAT_COLOR[plats[i][0]]}};
         }
         if(per>1)["B","C","D","E","F"].forEach(col=>ws.mergeCells(col+r+":"+col+(r+per-1)));
         r+=per;continue;
@@ -947,24 +949,24 @@ async function buildXlsx(posts,snapOnly,full){
       // time
       const tc=row.getCell(2);
       if(p.time){const [hh,mm]=p.time.split(":").map(Number);tc.value=(hh*60+mm)/1440;tc.numFmt="h:mm AM/PM"}else tc.value="TBD";
-      tc.font={name:"Arial",size:11,bold:true,color:{argb:"FF0A1A4A"}};
+      tc.font={name:XF_HEAD,size:11,bold:true,color:{argb:"FF0A1A4A"}};
       // caption
       const cc=row.getCell(4);cc.value=(p.caption&&p.caption.trim())||"TBD";
-      cc.font={name:"Arial",size:10,color:{argb:"FF1F2A44"}};cc.alignment={horizontal:"right",vertical:"middle",wrapText:true,readingOrder:"rtl"};
+      cc.font={name:XF_TEXT,size:10,color:{argb:"FF1F2A44"}};cc.alignment={horizontal:"right",vertical:"middle",wrapText:true,readingOrder:"rtl"};
       // design + animation
       [[5,p.design],[6,p.animation]].forEach(([c,u])=>{
         const cell=row.getCell(c);
-        if(u){cell.value={text:"Open ↗",hyperlink:u};cell.font={name:"Arial",size:10,bold:true,color:{argb:"FF0E61FE"}}}
-        else{cell.value="—";cell.font={name:"Arial",size:10,color:{argb:"FFB0B7C6"}}}
+        if(u){cell.value={text:"Open ↗",hyperlink:u};cell.font={name:XF_HEAD,size:10,bold:true,color:{argb:"FF0E61FE"}}}
+        else{cell.value="—";cell.font={name:XF_TEXT,size:10,color:{argb:"FFB0B7C6"}}}
       });
       // platforms
       plats.forEach(([k,l],i)=>{
         const pr=ws.getRow(r+i);
-        const g=pr.getCell(7);g.value=l;g.font={name:"Arial",size:10,bold:true,color:{argb:PLAT_COLOR[k]}};
+        const g=pr.getCell(7);g.value=l;g.font={name:XF_HEAD,size:10,bold:true,color:{argb:PLAT_COLOR[k]}};
         const urls=String((p.links&&p.links[k])||"").split(/\s+/).filter(Boolean);
         const h=pr.getCell(8);
-        if(urls.length){h.value={text:urls.join("\n"),hyperlink:urls[0]};h.font={name:"Arial",size:10,color:{argb:"FF0E61FE"}}}
-        else{h.value="TBD";h.font={name:"Arial",size:10,color:{argb:"FFB0B7C6"}}}
+        if(urls.length){h.value={text:urls.join("\n"),hyperlink:urls[0]};h.font={name:XF_TEXT,size:10,color:{argb:"FF0E61FE"}}}
+        else{h.value="TBD";h.font={name:XF_TEXT,size:10,color:{argb:"FFB0B7C6"}}}
         h.alignment={horizontal:"left",vertical:"middle",wrapText:true};
       });
       if(per>1)["B","C","D","E","F"].forEach(col=>ws.mergeCells(col+r+":"+col+(r+per-1)));
@@ -987,11 +989,15 @@ async function buildXlsx(posts,snapOnly,full){
     if(r-1>dayStart)ws.mergeCells("A"+dayStart+":A"+(r-1));
     const a=ws.getCell("A"+dayStart);
     a.value=EN_DAYS[dd.getUTCDay()]+"\n"+dd.getUTCDate()+" "+EN_MON[dd.getUTCMonth()];
-    a.font={name:"Arial",size:12,bold:true,color:{argb:"FF0E61FE"}};a.fill=fill("FFEAF1FF");
+    a.font={name:XF_HEAD,size:12,bold:true,color:{argb:"FF0E61FE"}};a.fill=fill("FFEAF1FF");
     a.alignment={horizontal:"center",vertical:"middle",wrapText:true};
     a.border={top:{style:"medium",color:{argb:"FF0A1A4A"}},bottom:LINE,left:LINE,right:LINE};
     for(let c=2;c<=8;c++){const cell=ws.getRow(dayStart).getCell(c);cell.border=Object.assign({},cell.border,{top:{style:"medium",color:{argb:"FF0A1A4A"}}})}
   }
+    // Mobily brand fonts on every cell, including ones without their own font
+  ws.eachRow({includeEmpty:true},row=>row.eachCell({includeEmpty:true},cell=>{
+    const f=cell.font||{};if(!f.name||f.name==="Calibri")cell.font=Object.assign({},f,{name:XF_TEXT});
+  }));
   const buf=await wb.xlsx.writeBuffer();
   const name=full?"Mobily Calendar "+MONTHS_EN_FULL[d0.getUTCMonth()]+" "+d0.getUTCFullYear()+(snapOnly?" Snapchat":"")+".xlsx":"Mobily_Calendar_"+EN_MON[d0.getUTCMonth()]+d0.getUTCDate()+"-"+(d0.getUTCMonth()===d1.getUTCMonth()?"":EN_MON[d1.getUTCMonth()])+d1.getUTCDate()+(snapOnly?"_Snapchat":"")+".xlsx";
   return {buf,name};

@@ -24,6 +24,7 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
 - Date picker: a week strip with post-count dots per day, plus an optional month grid.
 - «آخر التحديثات» sidebar on the left (content changes + dev commits); it can be hidden, and the choice is remembered per browser.
 - Post cards are compact (~200px wide).
+- Excel export always uses Mobily's brand fonts (Ali, 19 Nov 2026): `Mobily_Headline_v7` bold for title, headers, day, time, platform names and Open links; `Mobily_Text_v7` for captions, URLs and everything else. Never Arial or Calibri. Constants `XF_HEAD` / `XF_TEXT` in `index.html`; a final sweep sets the font on any cell left without one.
 - Excel export keeps the team's sheet layout (Date / Time / Visual / Caption / Design / Animation / Platform / Landing Page), with an option to keep only the Snapchat link. Excel import reads the same layout.
 - No approval buttons; the site is only for the two editors.
 - Caption spelling review uses the public LanguageTool API (Arabic). It only flags issues and suggestions, it never edits the caption. Words marked "مو غلط" go into the shared `public.dictionary` table and are skipped next time.
