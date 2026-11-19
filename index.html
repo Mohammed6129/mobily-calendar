@@ -851,6 +851,7 @@ function openEditor(p,dateForNew,isDup){
 
 /* ---------- export to Excel (same layout as the team's calendar sheet) ---------- */
 const EN_DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MONTHS_EN_FULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const EN_MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const PLAT_COLOR={X:"FF000000",Instagram:"FFC13584",Facebook:"FF1877F2",TikTok:"FF007D83",Snapchat:"FF9C7300"};
 function loadExcelJS(){
@@ -875,16 +876,20 @@ function openExport(){
    '<div class="tp-g ex" role="radiogroup" style="display:grid;gap:8px">'+
      '<label class="chk" style="border-radius:10px;padding:10px 12px"><input type="radio" name="exMode" value="all" checked> كل روابط المنصات (X، Instagram، Facebook، TikTok، Snapchat)</label>'+
      '<label class="chk" style="border-radius:10px;padding:10px 12px"><input type="radio" name="exMode" value="snap"> رابط سناب شات فقط</label>'+
-   '</div></div>'+
+   '</div>'+
+   '<label class="chk" style="border-radius:10px;padding:10px 12px"><input type="checkbox" id="exFull"> الشهر كامل حتى الأيام الفاضية، باسم ملف ثابت (عشان تستبدل ملف OneDrive وما يتغير رابطه)</label>'+
+   '</div>'+
    '<footer><button class="btn primary" id="exGo"'+(mp.length?'':' disabled')+'>صدّر الملف</button><button class="btn" id="exNo">إلغاء</button><span class="msg" id="exMsg">'+(mp.length?'':'ما فيه بوستات بهالشهر')+'</span></footer></div></div>';
   const close=()=>root.innerHTML="";
   $("#exX").onclick=close;$("#exNo").onclick=close;
   root.querySelector(".overlay").onclick=e=>{if(e.target.classList.contains("overlay"))close()};
+  $("#exFull").onchange=e=>{const on=e.target.checked||mp.length>0;$("#exGo").disabled=!on;$("#exMsg").textContent=on?"":"ما فيه بوستات بهالشهر"};
   $("#exGo").onclick=async()=>{
+    const full=$("#exFull").checked;
     const snapOnly=root.querySelector('input[name="exMode"]:checked').value==="snap";
     $("#exGo").disabled=true;$("#exMsg").textContent="جاري تجهيز الملف…";
     try{
-      const {buf,name}=await buildXlsx(mp,snapOnly);
+      const {buf,name}=await buildXlsx(mp,snapOnly,full);
       $("#exMsg").textContent="";
       const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
       close();toast("تم التصدير");
@@ -894,7 +899,7 @@ function openExport(){
     }
   };
 }
-async function buildXlsx(posts,snapOnly){
+async function buildXlsx(posts,snapOnly,full){
   await loadExcelJS();
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet("Calendar",{views:[{state:"frozen",ySplit:3,showGridLines:false}]});
@@ -902,8 +907,8 @@ async function buildXlsx(posts,snapOnly){
   const LINE={style:"thin",color:{argb:"FFD5DEF0"}};
   const fill=c=>({type:"pattern",pattern:"solid",fgColor:{argb:c}});
   const ps=posts.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:sortPosts(a,b));
-  const d0=parseISO(ps[0].date),d1=parseISO(ps[ps.length-1].date);
-  const range=EN_MON[d0.getUTCMonth()]+" "+d0.getUTCDate()+(ps[0].date===ps[ps.length-1].date?"":" – "+(d0.getUTCMonth()===d1.getUTCMonth()?"":EN_MON[d1.getUTCMonth()]+" ")+d1.getUTCDate())+", "+d1.getUTCFullYear();
+  const d0=full?parseISO(S.ym+"-01"):parseISO(ps[0].date),d1=full?parseISO(S.ym+"-"+pad(daysInMonth())):parseISO(ps[ps.length-1].date);
+  const range=full?EN_MON[d0.getUTCMonth()]+" 1 – "+d1.getUTCDate()+", "+d1.getUTCFullYear():EN_MON[d0.getUTCMonth()]+" "+d0.getUTCDate()+(ps[0].date===ps[ps.length-1].date?"":" – "+(d0.getUTCMonth()===d1.getUTCMonth()?"":EN_MON[d1.getUTCMonth()]+" ")+d1.getUTCDate())+", "+d1.getUTCFullYear();
   ws.mergeCells("A1:H1");
   const t=ws.getCell("A1");t.value="Mobily Consumer Calendar  ·  "+range;
   t.font={name:"Arial",size:18,bold:true,color:{argb:"FFFFFFFF"}};t.fill=fill("FF0E61FE");t.alignment={vertical:"middle",indent:1};
@@ -918,11 +923,21 @@ async function buildXlsx(posts,snapOnly){
   const rowH=snapOnly?120:32;
   let r=4;let dayIdx=-1;let lastDate=null;
   const byDay={};ps.forEach(p=>{(byDay[p.date]=byDay[p.date]||[]).push(p)});
+  if(full)for(let d=1;d<=daysInMonth();d++){const k=S.ym+"-"+pad(d);if(!byDay[k])byDay[k]=[null]}
   const imgCache={};
   for(const ds of Object.keys(byDay).sort()){
     dayIdx++;const dayPosts=byDay[ds];const dayStart=r;
     const base=dayIdx%2?"FFFFFFFF":"FFF6F9FF";
     for(const p of dayPosts){
+      if(!p){
+        for(let i=0;i<per;i++){
+          const row=ws.getRow(r+i);row.height=rowH;
+          for(let c=2;c<=8;c++){const cell=row.getCell(c);cell.fill=fill(base);cell.border={top:LINE,bottom:LINE,left:LINE,right:LINE};cell.alignment={horizontal:"center",vertical:"middle",wrapText:true};}
+          const g=row.getCell(7);g.value=plats[i][1];g.font={name:"Arial",size:10,bold:true,color:{argb:PLAT_COLOR[plats[i][0]]}};
+        }
+        if(per>1)["B","C","D","E","F"].forEach(col=>ws.mergeCells(col+r+":"+col+(r+per-1)));
+        r+=per;continue;
+      }
       const rowFill=missing(p).length?"FFFFF4D6":base;
       for(let i=0;i<per;i++){
         const row=ws.getRow(r+i);row.height=rowH;
@@ -978,7 +993,7 @@ async function buildXlsx(posts,snapOnly){
     for(let c=2;c<=8;c++){const cell=ws.getRow(dayStart).getCell(c);cell.border=Object.assign({},cell.border,{top:{style:"medium",color:{argb:"FF0A1A4A"}}})}
   }
   const buf=await wb.xlsx.writeBuffer();
-  const name="Mobily_Calendar_"+EN_MON[d0.getUTCMonth()]+d0.getUTCDate()+"-"+(d0.getUTCMonth()===d1.getUTCMonth()?"":EN_MON[d1.getUTCMonth()])+d1.getUTCDate()+(snapOnly?"_Snapchat":"")+".xlsx";
+  const name=full?"Mobily Calendar "+MONTHS_EN_FULL[d0.getUTCMonth()]+" "+d0.getUTCFullYear()+(snapOnly?" Snapchat":"")+".xlsx":"Mobily_Calendar_"+EN_MON[d0.getUTCMonth()]+d0.getUTCDate()+"-"+(d0.getUTCMonth()===d1.getUTCMonth()?"":EN_MON[d1.getUTCMonth()])+d1.getUTCDate()+(snapOnly?"_Snapchat":"")+".xlsx";
   return {buf,name};
 }
 
