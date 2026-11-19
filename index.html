@@ -842,17 +842,16 @@ function renderWeeks(){
 }
 function miniPost(p){
   const el=document.createElement("div");const ms=missing(p);
-  el.className="mp"+(ms.length?" notready":"");el.dataset.id=p.id;el.tabIndex=0;
+  el.className="mp"+(ms.length?" notready":"");el.dataset.id=p.id;el.tabIndex=0;el.title="اضغط للمعاينة";
   const m=(p.media||[])[0];
   const dn=dupOf(p);
   el.innerHTML='<div class="mp-th">'+(dn>1?'<span class="dupb" title="هالبوست مكرر '+dn+' مرات">x'+dn+'</span>':'')+(m?(isVideo(m)?'<video src="'+mediaUrl(m)+'" muted preload="metadata"></video>':'<img loading="lazy" alt="" src="'+mediaUrl(m)+'">'):'<span>بدون</span>')+'</div>'+
     '<div class="mp-t"><b>'+esc(p.time?fmtTime(p.time):"بدون وقت")+'</b><span>'+esc(postName(p))+'</span></div>'+
-    '<div class="mp-tools"><button type="button" data-a="eye" title="معاينة" aria-label="معاينة">'+IC.eye+'</button>'+
+    '<div class="mp-tools">'+
     (S.canEdit?'<button type="button" data-a="edit" title="تعديل" aria-label="تعديل">'+IC.edit+'</button><button type="button" data-a="dup" title="تكرار" aria-label="تكرار">'+IC.dup+'</button><button type="button" data-a="del" class="del" title="حذف" aria-label="حذف">'+IC.del+'</button>':'')+'</div>';
   const pv=()=>openPreview(p,el);
   el.onclick=e=>{if(e.target.closest("button")||el.__dragged)return;pv()};
   el.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();pv()}};
-  el.querySelector('[data-a="eye"]').onclick=pv;
   if(S.canEdit){
     el.querySelector('[data-a="edit"]').onclick=()=>{closePreview();openEditor(p)};
     el.querySelector('[data-a="dup"]').onclick=()=>{closePreview();openEditor(Object.assign({},p,{id:null}),null,true)};
