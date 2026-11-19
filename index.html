@@ -538,11 +538,34 @@ async function signPaths(paths){
 function isVideo(m){return m&&m.type==="video"}
 /* post name: stored in the "title" column; until that column exists it lives in links._title */
 function postTitle(p){return String((p&&(p.title||(p.links&&p.links._title)))||"").trim()}
+/* post name from the caption: the bundle or product, never a random line of copy */
+function guessName(cap){
+  const c=String(cap||"").replace(/[ـ]/g,"").replace(/\s+/g," ").trim();if(!c)return "";
+  let m;
+  if(/هوم\s*فايبر|فايبر/.test(c)){m=c.match(/(\d+)\s*ميجا/);return "هوم فايبر"+(m?" "+m[1]+" ميجا":"")}
+  if(/هوم\s*5G/i.test(c)){m=c.match(/(\d+)\s*ميجا/);return "موبايلي هوم 5G"+(m?" "+m[1]+" ميجا":"")}
+  if(m=c.match(/الأسبوعية\s*بلس|الأسبوعية/))return "الباقة "+m[0];
+  if(m=c.match(/باقة\s+(\d+\s*GB)/i))return "باقة "+m[1].replace(/\s+/g,"")+(/مسبق الدفع/.test(c)?" مسبق الدفع":"");
+  if(m=c.match(/مسبق الدفع\s*(\d{2,3})(?!\s*(?:ريال|جيجا|GB|دقيقة|يوم))/))return "باقة مسبق الدفع "+m[1];
+  // Latin product names (devices, apps) come before bundle names that only frame them
+  if(m=c.match(/[A-Za-z][A-Za-z0-9+]*(?:[ \t]+(?:[A-Za-z][A-Za-z0-9+]*|\d+[A-Za-z]*))*/)){
+    let n=m[0].replace(/\s+Series$/i,"").trim();
+    if(!/^(GB|MB|X|TV)$/i.test(n)){
+      if(/^(Apple Music|Apple TV|Apple Arcade|iCloud\+?|Shahid|Netflix|OSN\+?|Anghami)$/i.test(n)&&/شامل/.test(c))n+=" مع شامل";
+      return n;
+    }
+  }
+  if(m=c.match(/مفوتر\s+شامل\s+(\S+)/))return "باقة شامل "+m[1].replace(/[^؀-ۿA-Za-z0-9+]/g,"");
+  if(m=c.match(/باقة\s+([؀-ۿ]+(?:\s+[؀-ۿ0-9]+){0,2})/))return "باقة "+m[1];
+  return "";
+}
+/* the name to show: the saved name, or the bundle/product read from the caption */
+function nameOf(p){return postTitle(p)||guessName(p&&p.caption)}
 function withTitle(data,t){t=String(t||"").trim();const links=Object.assign({},data.links||{});delete links._title;
   if(S.hasTitle)return Object.assign(data,{title:t,links});if(t)links._title=t;return Object.assign(data,{links})}
 function missing(p){
   const out=[];
-  if(!postTitle(p))out.push("بدون اسم");
+  if(!nameOf(p))out.push("بدون اسم");
   if(!(p.media&&p.media.length))out.push("بدون صورة");
   if(!p.design||!String(p.design).trim())out.push("بدون ملفات تصميم");
   if(!p.caption||!p.caption.trim())out.push("بدون كابشن");
@@ -666,7 +689,7 @@ function card(p){
   if(p.animation)links.push('<a class="lk" href="'+esc(p.animation)+'" target="_blank" rel="noopener">الأنيميشن ↗</a>');
   const pl=PLATS.filter(([k])=>p.links&&p.links[k]);
   let body='<div class="body">';
-  const nm=postTitle(p);
+  const nm=nameOf(p);
   body+=nm?'<h3 class="ttl"><span>'+esc(nm)+'</span></h3>':'<h3 class="ttl none"><span>بدون اسم</span></h3>';
   if(ms.length)body+='<div class="nr">مو جاهز للنشر</div><div class="badges">'+ms.map(b=>'<span class="badge">'+b+'</span>').join("")+'</div>';
   if(p.caption&&p.caption.trim())body+='<p class="cap clamp">'+esc(p.caption.trim())+'</p><button class="more hidden">اقرأ الكابشن كامل</button>';
@@ -723,7 +746,7 @@ function renderMonth(mp){
     c.innerHTML='<div class="n"><span>'+d+'</span>'+'</div><div class="thumbs"></div>';
     const th=c.querySelector(".thumbs");
     ps.slice(0,4).forEach(p=>{
-      const t=document.createElement("div");t.className="t"+(missing(p).length?" miss":"");t.title=(postTitle(p)?postTitle(p)+" · ":"")+fmtTime(p.time);
+      const t=document.createElement("div");t.className="t"+(missing(p).length?" miss":"");t.title=(nameOf(p)?nameOf(p)+" · ":"")+fmtTime(p.time);
       const m=(p.media||[])[0];
       t.innerHTML=(m?(isVideo(m)?'<video src="'+mediaUrl(m)+'" muted preload="metadata"></video>':'<img loading="lazy" alt="" src="'+mediaUrl(m)+'">'):'')+'<i>'+esc(p.time||"؟")+'</i>';
       if(S.canEdit){t.draggable=true;
@@ -748,7 +771,7 @@ const wkStart=d=>addDays(d,-parseISO(d).getUTCDay());
 function dupKey(p){const c=String(p.caption||"").replace(/[\u064B-\u0652\u0640]/g,"").replace(/\s+/g," ").trim();if(c)return "c:"+c;const t=String(postTitle(p)||"").replace(/\s+/g," ").trim();return t?"t:"+t:""}
 function dupCounts(){const m={};S.posts.forEach(p=>{const k=dupKey(p);if(k)m[k]=(m[k]||0)+1});S.dups=m}
 function dupOf(p){const k=dupKey(p);return k&&S.dups?(S.dups[k]||1):1}
-function postName(p){return postTitle(p)||(p.caption||"").trim().split("\n")[0].slice(0,40)||"بدون اسم"}
+function postName(p){return nameOf(p)||"بدون اسم"}
 function renderWeeks(){
   dupCounts();
   const main=$("#main");main.innerHTML="";
@@ -895,7 +918,7 @@ function openLightbox(p,i){
       '<button class="x" aria-label="إغلاق">✕</button>'+
       (isVideo(m)?'<video src="'+mediaUrl(m)+'" controls autoplay playsinline></video>':'<img alt="تصميم البوست" src="'+mediaUrl(m)+'">')+
       (media.length>1?'<button class="nav prev" aria-label="السابق">›</button><button class="nav next" aria-label="التالي">‹</button><span class="pos">'+(i+1)+' / '+media.length+'</span>':'')+
-      '</div><aside>'+(postTitle(p)?'<h2 class="lb-ttl">'+esc(postTitle(p))+'</h2>':'')+'<h3>'+dayName(p.date)+' '+shortDate(p.date)+' · '+esc(fmtTime(p.time))+'</h3><p>'+esc(p.caption||"الكابشن لسا ما نزل")+'</p></aside></div>';
+      '</div><aside>'+(nameOf(p)?'<h2 class="lb-ttl">'+esc(nameOf(p))+'</h2>':'')+'<h3>'+dayName(p.date)+' '+shortDate(p.date)+' · '+esc(fmtTime(p.time))+'</h3><p>'+esc(p.caption||"الكابشن لسا ما نزل")+'</p></aside></div>';
     root.querySelector(".x").onclick=close;
     root.querySelector(".lb").onclick=e=>{if(e.target.classList.contains("stage"))close()};
     const pv=root.querySelector(".prev"),nx=root.querySelector(".next");
@@ -927,7 +950,7 @@ function openEditor(p,dateForNew,isDup){
   root.innerHTML='<div class="overlay"><form class="modal" role="dialog" aria-modal="true" id="ed">'+
    '<header><h2>'+(isDup?'تكرار بوست':isNew?'بوست جديد':'تعديل البوست')+'</h2><button type="button" class="icon-btn" id="edX" aria-label="إغلاق">✕</button></header>'+
    '<div class="content">'+
-    '<div class="field"><label for="fTitle">اسم المنشور</label><input type="text" id="fTitle" maxlength="80" value="'+esc(postTitle(v))+'" placeholder="مثلًا: AirPods 5 أو باقة 100GB"></div>'+
+    '<div class="field"><label for="fTitle">اسم المنشور</label><input type="text" id="fTitle" maxlength="80" value="'+esc(nameOf(v))+'" placeholder="اسم الباقة أو المنتج، مثلًا: AirPods 5 أو باقة 100GB"></div>'+
     '<div class="field"><label>التاريخ <span class="hint" id="dLabel"></span></label><input type="hidden" id="fDate" value="'+esc(v.date||dateForNew||todayISO)+'"><div class="dp" id="dp"></div></div>'+
     '<div class="field"><label>الوقت <span class="hint" id="tLabel"></span></label><div class="tp" id="tp">'+
       '<div class="tp-pre">'+PRESETS.map(([t,l])=>'<button type="button" class="tp-chip" data-p="'+t+'"><b>'+fmtTime(t).replace(/ [صم]$/,"")+'</b><small>'+l+'</small></button>').join("")+
@@ -1055,6 +1078,9 @@ function openEditor(p,dateForNew,isDup){
       st.uploading--;drawMedia();
     }
   }
+  {const fT=$("#fTitle"),fC=$("#fCap");let auto=!postTitle(v);
+   fT.addEventListener("input",()=>{auto=!fT.value.trim()});
+   fC.addEventListener("input",()=>{if(auto)fT.value=guessName(fC.value)});}
   $("#fFile").onchange=e=>{upload(e.target.files);e.target.value=""};
   const dz=$("#dz");
   dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("over")});
@@ -1191,7 +1217,7 @@ async function buildXlsx(posts,snapOnly,full){
       if(p.time){const [hh,mm]=p.time.split(":").map(Number);tc.value=(hh*60+mm)/1440;tc.numFmt="h:mm AM/PM"}else tc.value="TBD";
       tc.font={name:XF_HEAD,size:11,bold:true,color:{argb:"FF0A1A4A"}};
       // post name
-      const nc=row.getCell(3);const nm=postTitle(p);nc.value=nm||"TBD";
+      const nc=row.getCell(3);const nm=nameOf(p);nc.value=nm||"TBD";
       nc.font={name:XF_HEAD,size:11,bold:true,color:{argb:nm?"FF0A1A4A":"FFB0B7C6"}};nc.alignment={horizontal:"center",vertical:"middle",wrapText:true,readingOrder:"rtl"};
       // caption
       const cc=row.getCell(5);cc.value=(p.caption&&p.caption.trim())||"TBD";
