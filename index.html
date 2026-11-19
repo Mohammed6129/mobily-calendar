@@ -296,6 +296,45 @@ details.plat{border-top-color:var(--line)}
 .tp-seg button{border:0;background:none;padding:6px 11px;font-weight:600;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:5px;cursor:pointer}
 .tp-seg button+button{border-inline-start:1px solid var(--line)}
 .tp-seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.layout{max-width:1600px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:0 22px;padding:0 20px}
+.layout .summary,.layout main{max-width:none;padding-inline:0}
+.top-in{max-width:1600px}
+.feed{position:sticky;top:90px;align-self:start;margin-top:16px;max-height:calc(100vh - 110px);display:flex;flex-direction:column;background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-border);border-radius:20px;box-shadow:var(--shadow);overflow:hidden}
+.feed-head{display:flex;align-items:center;gap:8px;padding:14px 16px 8px}
+.feed-head b{font-family:var(--f-display);font-size:16px}
+.live{font-size:11px;color:#1f9d55;display:inline-flex;align-items:center;gap:5px}
+.live::before{content:"";width:7px;height:7px;border-radius:50%;background:#34c759;box-shadow:0 0 0 3px rgba(52,199,89,.18)}
+.feed-x{display:none;margin-inline-start:auto;width:30px;height:30px}
+.feed-f{display:flex;gap:5px;flex-wrap:wrap;padding:0 16px 10px;border-bottom:1px solid var(--line)}
+.feed-f button{border:1px solid var(--line);background:rgba(255,255,255,.6);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--muted);cursor:pointer}
+.feed-f button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.feed-list{overflow:auto;padding:6px 10px 14px;display:grid;gap:2px;align-content:start}
+.feed-g{font-size:11px;color:var(--muted);padding:10px 6px 4px;font-weight:600}
+.fe{display:grid;grid-template-columns:28px 1fr;gap:9px;padding:7px 6px;border-radius:12px;cursor:pointer;text-align:start;border:0;background:none;color:inherit;width:100%}
+.fe:hover{background:rgba(255,255,255,.7)}
+.av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700}
+.av.m{background:rgba(0,113,227,.12);color:#0062c4}
+.av.a{background:rgba(175,82,222,.14);color:#8a3fb5}
+.av.s{background:rgba(0,0,0,.06);color:var(--muted)}
+.fe>span:last-child{display:block;min-width:0}
+.fe-t{display:block;font-size:13px;line-height:1.55}
+.fe-t svg{vertical-align:-2px;color:var(--muted);margin-inline-end:3px}
+.fe-t em{font-style:normal;color:var(--muted)}
+.fe-w{display:block;font-size:11px;color:var(--muted);margin-top:1px}
+.fe.dev{background:rgba(52,199,89,.09)}
+.fe.dev .fe-t svg{color:#1f9d55}
+.dev-b{font-size:10.5px;color:#1f9d55;background:rgba(255,255,255,.85);border-radius:999px;padding:0 7px;margin-inline-start:4px;white-space:nowrap}
+.card.flash{animation:flash 1.6s ease}
+@keyframes flash{0%,60%{box-shadow:0 0 0 3px var(--accent),var(--shadow)}100%{box-shadow:var(--shadow)}}
+.feed-btn{display:none}
+@media (max-width:1100px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .feed{position:fixed;top:0;left:0;bottom:0;width:min(360px,92vw);max-height:none;margin:0;border-radius:0 20px 20px 0;z-index:40;transform:translateX(-105%);transition:transform .2s}
+  .feed.open{transform:none}
+  .feed-x{display:grid}
+  .feed-btn{display:inline-flex}
+}
+@media (prefers-reduced-motion: reduce){.card.flash{animation:none;outline:3px solid var(--accent)}}
 .tools button{width:34px;height:30px;padding:0;display:inline-grid;place-items:center}
 .tools{gap:6px;flex-wrap:nowrap}
 .card.notready{background:linear-gradient(var(--warn-soft),var(--warn-soft)),var(--glass);border-color:rgba(255,179,0,.7);box-shadow:0 0 0 1px rgba(255,179,0,.5),var(--shadow)}
@@ -328,14 +367,22 @@ details.plat{border-top-color:var(--line)}
       <button id="vList" aria-pressed="true">القائمة</button>
       <button id="vMonth" aria-pressed="false">الشهر</button>
     </div>
+    <button class="btn hidden feed-btn" id="feedBtn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg> التحديثات</button>
     <button class="btn hidden" id="importBtn">استيراد Excel</button>
     <button class="btn hidden" id="exportBtn">تصدير Excel</button>
     <button class="btn primary hidden" id="addBtn">+ بوست جديد</button>
   </div>
 </div>
 
+<div class="layout"><div class="col-main">
 <div class="summary" id="summary"></div>
 <main id="main"><div class="notice">جاري تحميل البوستات…</div></main>
+</div>
+<aside class="feed hidden" id="feed" aria-label="آخر التحديثات">
+  <div class="feed-head"><b>آخر التحديثات</b><span class="live" id="feedLive">مباشر</span><button type="button" class="icon-btn feed-x" id="feedX" aria-label="إغلاق">✕</button></div>
+  <div class="feed-f" id="feedF"></div>
+  <div class="feed-list" id="feedList"><div class="hint">جاري التحميل…</div></div>
+</aside></div>
 
 <div class="login hidden" id="login"><form class="login-card" id="loginForm">
   <h2>تقويم محتوى موبايلي</h2>
@@ -416,7 +463,9 @@ async function start(session){
   $("#addBtn").classList.remove("hidden");$("#importBtn").classList.remove("hidden");$("#exportBtn").classList.remove("hidden");$("#signOut").classList.remove("hidden");
   $("#roleLine").textContent=session.user.email;
   if(location.hash.includes("access_token"))history.replaceState(null,"",location.pathname);
+  S.me=String(session.user.email||"").toLowerCase();
   await loadPosts(true);
+  startFeed();
   let t=null;
   sb.channel("posts-live").on("postgres_changes",{event:"*",schema:"public",table:"posts"},()=>{clearTimeout(t);t=setTimeout(()=>loadPosts(false),250)}).subscribe();
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)loadPosts(false)});
@@ -917,6 +966,83 @@ async function buildXlsx(posts,snapOnly){
 }
 
 
+
+
+/* ---------- activity feed: content changes (DB trigger) + site development (GitHub commits) ---------- */
+const PEOPLE={"mohd6129@gmail.com":{name:"محمد",cls:"m",gh:"mohammed6129"},"alaawii808@gmail.com":{name:"علي",cls:"a",gh:"ab808-pixel"}};
+const GH_REPO="Mohammed6129/mobily-calendar";
+const FEED={acts:[],commits:[],filter:"all"};
+const FICON={"create": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg>", "delete": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 6h18\"/><path d=\"M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6\"/></svg>", "move": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4\"/></svg>", "update": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z\"/></svg>", "media": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"9\" cy=\"9\" r=\"2\"/><path d=\"M21 15l-5-5L5 21\"/></svg>", "links": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1\"/><path d=\"M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1\"/></svg>", "time": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>", "dev": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 6l-6 6 6 6M16 6l6 6-6 6\"/></svg>", "feed": "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12h4l3 8 4-16 3 8h4\"/></svg>"};
+const VERB={create:["أضفت","أضاف"],delete:["حذفت","حذف"],move:["نقلت","نقل"],update:["عدّلت","عدّل"],media:["رفعت تصميم لـ","رفع تصميم لـ"],links:["حدّثت روابط","حدّث روابط"],time:["غيّرت وقت","غيّر وقت"],dev:["طوّرت","طوّر"]};
+const FIELD_AR={date:"التاريخ",time:"الوقت",caption:"الكابشن",media:"التصميم",design:"رابط ملفات التصميم",animation:"رابط الأنيميشن",links:"الروابط المختصرة",landing:"الرابط الأصلي",note:"الملاحظة"};
+function personOf(email){if(!email||email==="system")return {name:"النظام",cls:"s",key:"system"};const p=PEOPLE[email.toLowerCase()];return {name:p?p.name:email.split("@")[0],cls:p?p.cls:"s",key:email.toLowerCase()}}
+function personOfGh(login){const e=Object.keys(PEOPLE).find(k=>PEOPLE[k].gh===String(login||"").toLowerCase());return e?Object.assign(personOf(e),{key:e}):{name:login||"؟",cls:"s",key:"gh:"+login}}
+function whoVerb(per,verb){const me=per.key===S.me;return {who:me?"أنت":per.name,v:VERB[verb][me?0:1]}}
+function relTime(iso){const d=new Date(iso),diff=(Date.now()-d)/60000;if(diff<1)return "الحين";if(diff<60)return "قبل "+Math.round(diff)+" دقيقة";const h=d.getHours(),m=d.getMinutes();return ((h+11)%12+1)+":"+pad(m)+" "+(h<12?"ص":"م")}
+function dayKey(iso){const d=new Date(iso);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function dayTitle(k){const t=todayISO,y=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())})();if(k===t)return "اليوم";if(k===y)return "أمس";return dayName(k)+" "+shortDate(k)}
+async function loadActivity(){const {data,error}=await sb.from("activity").select("*").order("at",{ascending:false}).limit(150);if(!error){FEED.acts=data||[];renderFeed()}}
+async function loadCommits(){
+  try{const r=await fetch("https://api.github.com/repos/"+GH_REPO+"/commits?per_page=40",{cache:"no-store"});if(!r.ok)return;
+    const j=await r.json();FEED.commits=j.map(c=>({at:c.commit.author.date,login:c.author&&c.author.login,msg:String(c.commit.message||"").split("\n")[0],url:c.html_url}));renderFeed()}catch(e){}
+}
+function feedItems(){
+  const items=[];
+  // collapse bursts (e.g. an Excel import): same person, same action, within 3 minutes
+  let i=0;const A=FEED.acts;
+  while(i<A.length){const a=A[i];let j=i+1;while(j<A.length&&A[j].actor===a.actor&&A[j].action===a.action&&a.action!=="update"&&Math.abs(new Date(A[j-1].at)-new Date(A[j].at))<180000)j++;
+    items.push({kind:"content",at:a.at,a,count:j-i});i=j}
+  FEED.commits.forEach(c=>items.push({kind:"dev",at:c.at,c}));
+  items.sort((x,y)=>new Date(y.at)-new Date(x.at));
+  const f=FEED.filter;
+  return items.filter(it=>f==="all"||(f==="content"&&it.kind==="content")||(f==="dev"&&it.kind==="dev")||(it.kind==="content"?personOf(it.a.actor).key===f:personOfGh(it.c.login).key===f));
+}
+function contentText(a,count){
+  const per=personOf(a.actor),d=a.details||{},lbl='<em>«'+esc(a.label)+'»</em>';
+  if(count>1){const w=whoVerb(per,a.action);return {per,icon:FICON[a.action]||FICON.update,html:w.who+" "+w.v+" "+count+" بوست"}}
+  if(a.action==="create"){const w=whoVerb(per,"create");return {per,icon:FICON.create,html:w.who+" "+w.v+" "+lbl+(d.date?" ليوم "+shortDate(d.date):"")}}
+  if(a.action==="delete"){const w=whoVerb(per,"delete");return {per,icon:FICON.delete,html:w.who+" "+w.v+" "+lbl}}
+  if(a.action==="move"){const w=whoVerb(per,"move");return {per,icon:FICON.move,html:w.who+" "+w.v+" "+lbl+" من "+parseISO(d.from).getUTCDate()+" إلى "+shortDate(d.to)}}
+  const f=d.fields||[];
+  if(f.length===1&&f[0]==="media"&&d.media_delta>0){const w=whoVerb(per,"media");return {per,icon:FICON.media,html:w.who+" "+w.v+" "+lbl}}
+  if(f.length===1&&f[0]==="links"){const w=whoVerb(per,"links");return {per,icon:FICON.links,html:w.who+" "+w.v+" "+lbl+(d.links?" ("+d.links+")":"")}}
+  if(f.length===1&&f[0]==="time"){const w=whoVerb(per,"time");return {per,icon:FICON.time,html:w.who+" "+w.v+" "+lbl+" إلى "+esc(fmtTime(d.new_time))}}
+  const w=whoVerb(per,"update");return {per,icon:FICON.update,html:w.who+" "+w.v+" "+lbl+(f.length?": "+f.map(x=>FIELD_AR[x]||x).join("، "):"")}
+}
+function renderFeed(){
+  const box=$("#feedList");if(!box)return;
+  const people=[{k:"all",t:"الكل"},{k:"content",t:"المحتوى"},{k:"dev",t:"تطوير الموقع"},{k:S.me,t:"أنا"}].concat(Object.keys(PEOPLE).filter(e=>e!==S.me).map(e=>({k:e,t:PEOPLE[e].name})));
+  $("#feedF").innerHTML=people.map(p=>'<button type="button" data-f="'+esc(p.k)+'" aria-pressed="'+(FEED.filter===p.k)+'">'+esc(p.t)+'</button>').join("");
+  $("#feedF").querySelectorAll("button").forEach(b=>b.onclick=()=>{FEED.filter=b.dataset.f;renderFeed()});
+  const items=feedItems();
+  if(!items.length){box.innerHTML='<div class="hint" style="padding:12px 6px">ما فيه تحديثات لين الحين. أي تعديل يصير يطلع هنا على طول.</div>';return}
+  let h="",lastDay="";
+  items.slice(0,120).forEach((it,idx)=>{
+    const k=dayKey(it.at);if(k!==lastDay){h+='<div class="feed-g">'+dayTitle(k)+'</div>';lastDay=k}
+    if(it.kind==="dev"){const per=personOfGh(it.c.login),w=whoVerb(per,"dev");
+      h+='<button type="button" class="fe dev" data-url="'+esc(it.c.url)+'"><span class="av '+per.cls+'">'+esc(per.name.slice(0,1))+'</span><span><span class="fe-t">'+FICON.dev+w.who+" "+w.v+": "+esc(it.c.msg)+'<span class="dev-b">تطوير</span></span><span class="fe-w">'+relTime(it.at)+' · على الموقع</span></span></button>';}
+    else{const c=contentText(it.a,it.count);
+      h+='<button type="button" class="fe" data-post="'+esc(it.count>1?"":it.a.post_id||"")+'"><span class="av '+c.per.cls+'">'+esc(c.per.name.slice(0,1))+'</span><span><span class="fe-t">'+c.icon+c.html+'</span><span class="fe-w">'+relTime(it.at)+'</span></span></button>';}
+  });
+  box.innerHTML=h;
+  box.querySelectorAll("[data-url]").forEach(b=>b.onclick=()=>window.open(b.dataset.url,"_blank","noopener"));
+  box.querySelectorAll("[data-post]").forEach(b=>b.onclick=()=>{const id=b.dataset.post;if(id)goToPost(id)});
+}
+function goToPost(id){
+  const p=S.posts.find(x=>x.id===id);if(!p){toast("هذا البوست انحذف");return}
+  S.view="list";S.ym=p.date.slice(0,7);render();
+  $("#feed").classList.remove("open");
+  requestAnimationFrame(()=>{const el=document.querySelector('.card[data-id="'+CSS.escape(id)+'"]');if(!el)return;el.scrollIntoView({block:"center",behavior:"smooth"});el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash")});
+}
+function startFeed(){
+  $("#feed").classList.remove("hidden");$("#feedBtn").classList.remove("hidden");
+  $("#feedBtn").onclick=()=>$("#feed").classList.toggle("open");$("#feedX").onclick=()=>$("#feed").classList.remove("open");
+  loadActivity();loadCommits();
+  let t=null;sb.channel("activity-live").on("postgres_changes",{event:"INSERT",schema:"public",table:"activity"},()=>{clearTimeout(t);t=setTimeout(loadActivity,300)}).subscribe();
+  setInterval(()=>{if(!document.hidden)loadCommits()},120000);
+  setInterval(()=>{if(!document.hidden)renderFeed()},60000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadActivity();loadCommits()}});
+}
 
 /* ---------- spelling review (flags only, never changes the text) ---------- */
 let DICT=null;

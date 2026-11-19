@@ -11,6 +11,7 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
   - RLS: only signed-in users can read/write. Sign-ups are disabled; people are invited from Supabase → Authentication → Users.
   - realtime is on for `posts`, so open pages refresh by themselves.
   - table `public.dictionary` — shared spelling whitelist (`word`).
+  - table `public.activity` — change log filled by the `posts_activity` trigger (who did what to which post). Kept 90 days. See `supabase/activity.sql`.
   - schema lives in `supabase/schema.sql`.
 - Libraries come from CDNs (supabase-js, ExcelJS, JSZip). Pin exact versions.
 
@@ -24,6 +25,7 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
 - Caption spelling review uses the public LanguageTool API (Arabic). It only flags issues and suggestions, it never edits the caption. Words marked "مو غلط" go into the shared `public.dictionary` table and are skipped next time.
 
 ## Working on it
+- **Commit messages: write the first line in simple Arabic** describing the change for a non-technical reader (e.g. «إضافة فلتر حسب المنصة»). The site's «آخر التحديثات» sidebar shows that line to Mohammed and Ali as a development update. Technical detail can go in the body.
 - Edit `index.html`, test locally with any static server, commit to `main`, push. Vercel deploys in ~10 s.
 - Keep everything in one file unless there's a strong reason not to.
 - Never commit the Supabase service-role key or any secret.
