@@ -19,7 +19,10 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
 - UI is Arabic, RTL, Saudi dialect, light Apple-style grey with frosted-glass surfaces. No dark mode.
 - A post is **not ready** (yellow highlight + reason badges) when it has no image, no design-files link, no caption, no time, or no platform links. If `landing` is filled but short links are missing it shows "بانتظار الاختصار". It turns normal by itself once fixed.
 - Platform short links are collapsed in the editor; the landing (original) URL field is always visible and is **never** exported to Excel.
-- Time picker: hour boxes 1–12 in a 4×3 grid, minutes 00/15/30/45 only, AM/PM, or "no time".
+- Time picker: one-tap presets 11:00 / 15:00 / 19:00 (marked «محجوز» if another post that day uses it; new posts auto-pick the first free one), plus «وقت ثاني» (hour select, minutes 00/15/30/45, AM ☀ / PM ☾) and «بدون وقت».
+- Date picker: a week strip with post-count dots per day, plus an optional month grid.
+- «آخر التحديثات» sidebar on the left (content changes + dev commits); it can be hidden, and the choice is remembered per browser.
+- Post cards are compact (~200px wide).
 - Excel export keeps the team's sheet layout (Date / Time / Visual / Caption / Design / Animation / Platform / Landing Page), with an option to keep only the Snapchat link. Excel import reads the same layout.
 - No approval buttons; the site is only for the two editors.
 - Caption spelling review uses the public LanguageTool API (Arabic). It only flags issues and suggestions, it never edits the caption. Words marked "مو غلط" go into the shared `public.dictionary` table and are skipped next time.
