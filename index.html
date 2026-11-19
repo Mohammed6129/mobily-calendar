@@ -244,6 +244,23 @@ details.plat{border-top-color:var(--line)}
 .drop-zone,.tp{background:rgba(255,255,255,.45);border-color:var(--line);border-radius:14px}
 .tp-g button{background:rgba(255,255,255,.8);border-color:var(--line);border-radius:10px}
 .tp-g button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.tp-pre{display:flex;flex-wrap:wrap;gap:8px}
+.tp-chip{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-width:92px;min-height:54px;padding:6px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.85);color:var(--ink);cursor:pointer;line-height:1.3}
+.tp-chip b{font-size:16px;font-variant-numeric:tabular-nums}
+.tp-chip small{font-size:12px;color:var(--muted)}
+.tp-chip:hover{border-color:var(--accent)}
+.tp-chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.tp-chip[aria-pressed="true"] small{color:rgba(255,255,255,.85)}
+.tp-chip.taken:not([aria-pressed="true"]){border-style:dashed;color:var(--muted)}
+.tp-chip.ghost{flex-direction:row;gap:6px;min-width:auto;color:var(--muted);border-style:dashed}
+.tp-chip.ghost[aria-pressed="true"]{border-style:solid;color:#fff}
+.tp-cus{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line);opacity:.5;transition:opacity .15s}
+.tp-cus.on{opacity:1}
+.tp-cus select{border:1px solid var(--line);background:rgba(255,255,255,.85);border-radius:10px;padding:6px 10px;font-weight:600}
+.tp-seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:rgba(255,255,255,.85)}
+.tp-seg button{border:0;background:none;padding:6px 11px;font-weight:600;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+.tp-seg button+button{border-inline-start:1px solid var(--line)}
+.tp-seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
 .tools button{width:34px;height:30px;padding:0;display:inline-grid;place-items:center}
 .tools{gap:6px;flex-wrap:nowrap}
 .card.notready{background:linear-gradient(var(--warn-soft),var(--warn-soft)),var(--glass);border-color:rgba(255,179,0,.7);box-shadow:0 0 0 1px rgba(255,179,0,.5),var(--shadow)}
@@ -300,6 +317,7 @@ details.plat{border-top-color:var(--line)}
 "use strict";
 const DAYS=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
 const MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+const PRESETS=[["11:00","الصبح"],["15:00","العصر"],["19:00","المغرب"]];
 const PLATS=[["X","X"],["Instagram","Instagram"],["Facebook","Facebook"],["TikTok","TikTok"],["Snapchat","Snapchat"]];
 
 const S={posts:[],ym:null,view:"list",canEdit:false,db:null,onlyMissing:false,showEmpty:false,loaded:false,dragId:null,urls:{}};
@@ -572,9 +590,14 @@ function openEditor(p,dateForNew,isDup){
    '<div class="content">'+
     '<div class="field" style="max-width:260px"><label for="fDate">التاريخ</label><input type="date" id="fDate" required value="'+esc(v.date||dateForNew||todayISO)+'"></div>'+
     '<div class="field"><label>الوقت <span class="hint" id="tLabel"></span></label><div class="tp" id="tp">'+
-      '<div class="tp-row"><span class="tp-l">الساعة</span><div class="tp-g h">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(h=>'<button type="button" data-h="'+h+'">'+h+'</button>').join("")+'</div></div>'+
-      '<div class="tp-row"><span class="tp-l">الدقيقة</span><div class="tp-g m">'+["00","15","30","45"].map(m=>'<button type="button" data-m="'+m+'">'+m+'</button>').join("")+'</div></div>'+
-      '<div class="tp-row"><span class="tp-l">الفترة</span><div class="tp-g a"><button type="button" data-a="am">صباحًا</button><button type="button" data-a="pm">مساءً</button><button type="button" data-a="none" class="tp-none">بدون وقت</button></div></div>'+
+      '<div class="tp-pre">'+PRESETS.map(([t,l])=>'<button type="button" class="tp-chip" data-p="'+t+'"><b>'+fmtTime(t).replace(/ [صم]$/,"")+'</b><small>'+l+'</small></button>').join("")+
+        '<button type="button" class="tp-chip ghost" data-mode="custom"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> وقت ثاني</button>'+
+        '<button type="button" class="tp-chip ghost" data-mode="none">بدون وقت</button></div>'+
+      '<div class="tp-cus" id="tpc"><span class="tp-l">وقت ثاني</span>'+
+        '<select id="tpH" aria-label="الساعة">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(h=>'<option value="'+h+'">'+h+'</option>').join("")+'</select><span>:</span>'+
+        '<div class="tp-seg" id="tpM">'+["00","15","30","45"].map(m=>'<button type="button" data-m="'+m+'">'+m+'</button>').join("")+'</div>'+
+        '<div class="tp-seg" id="tpA"><button type="button" data-a="am" title="صباحًا"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg> ص</button><button type="button" data-a="pm" title="مساءً"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg> م</button></div>'+
+      '</div>'+
     '</div></div>'+
     '<div class="field"><label>التصميم</label><div class="drop-zone" id="dz"><div class="mlist" id="mlist"></div>'+
       '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label class="btn" for="fFile" style="cursor:pointer">ارفع صور أو فيديو</label><input type="file" id="fFile" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" multiple class="hidden">'+
@@ -595,19 +618,33 @@ function openEditor(p,dateForNew,isDup){
   $("#edX").onclick=close;$("#edCancel").onclick=close;
   document.addEventListener("keydown",onKey);
 
-  // time picker: hour boxes + fixed quarter-hour minutes + AM/PM
-  const ts={h:null,m:"00",a:"pm",none:true};
-  if(v.time){const [hh,mm]=v.time.split(":").map(Number);ts.none=false;ts.a=hh<12?"am":"pm";ts.h=((hh+11)%12)+1;ts.m=pad((Math.round(mm/15)*15)%60)}
-  function tVal(){if(ts.none||ts.h==null)return "";let h=ts.h%12;if(ts.a==="pm")h+=12;return pad(h)+":"+ts.m}
+  // time picker: usual posting times as one-tap presets, rare times in a compact row
+  const ts={mode:"none",preset:"",h:4,m:"30",a:"pm",touched:false};
+  const isPreset=t=>PRESETS.some(x=>x[0]===t);
+  const takenOn=d=>S.posts.filter(x=>x.date===d&&(!p||x.id!==p.id||isDup)).map(x=>x.time).filter(Boolean);
+  function setCustomFrom(t){const [hh,mm]=t.split(":").map(Number);ts.a=hh<12?"am":"pm";ts.h=((hh+11)%12)+1;ts.m=pad((Math.round(mm/15)*15)%60)}
+  function autoPick(){const taken=takenOn($("#fDate").value);const free=PRESETS.find(x=>!taken.includes(x[0]));if(free){ts.mode="preset";ts.preset=free[0]}else ts.mode="none"}
+  if(v.time){if(isPreset(v.time)){ts.mode="preset";ts.preset=v.time}else{ts.mode="custom";setCustomFrom(v.time)}}
+  else if(isNew&&!isDup)autoPick();
+  function tVal(){if(ts.mode==="preset")return ts.preset;if(ts.mode==="custom"){let h=ts.h%12;if(ts.a==="pm")h+=12;return pad(h)+":"+ts.m}return ""}
   function drawTime(){
-    document.querySelectorAll("#tp [data-h]").forEach(b=>b.setAttribute("aria-pressed",!ts.none&&Number(b.dataset.h)===ts.h));
-    document.querySelectorAll("#tp [data-m]").forEach(b=>b.setAttribute("aria-pressed",!ts.none&&b.dataset.m===ts.m));
-    document.querySelectorAll("#tp [data-a]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.a==="none"?ts.none:(!ts.none&&b.dataset.a===ts.a)));
-    $("#tLabel").textContent=tVal()?"· "+fmtTime(tVal()):"· لم يحدد";
+    const taken=takenOn($("#fDate").value);
+    document.querySelectorAll("#tp [data-p]").forEach(b=>{const t=b.dataset.p;b.setAttribute("aria-pressed",ts.mode==="preset"&&ts.preset===t);b.classList.toggle("taken",taken.includes(t));b.querySelector("small").textContent=(PRESETS.find(x=>x[0]===t)[1])+(taken.includes(t)?" · محجوز":"")});
+    document.querySelectorAll("#tp [data-mode]").forEach(b=>b.setAttribute("aria-pressed",ts.mode===b.dataset.mode));
+    $("#tpc").classList.toggle("on",ts.mode==="custom");
+    $("#tpH").value=String(ts.h);
+    document.querySelectorAll("#tpM [data-m]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===ts.m));
+    document.querySelectorAll("#tpA [data-a]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.a===ts.a));
+    const t=tVal();$("#tLabel").textContent=t?"· "+fmtTime(t)+(taken.includes(t)?" (فيه بوست ثاني بنفس الوقت)":""):"· لم يحدد";
   }
-  document.querySelectorAll("#tp [data-h]").forEach(b=>b.onclick=()=>{ts.h=Number(b.dataset.h);ts.none=false;drawTime()});
-  document.querySelectorAll("#tp [data-m]").forEach(b=>b.onclick=()=>{ts.m=b.dataset.m;ts.none=false;if(ts.h==null)ts.h=12;drawTime()});
-  document.querySelectorAll("#tp [data-a]").forEach(b=>b.onclick=()=>{if(b.dataset.a==="none"){ts.none=true}else{ts.a=b.dataset.a;ts.none=false;if(ts.h==null)ts.h=12}drawTime()});
+  document.querySelectorAll("#tp [data-p]").forEach(b=>b.onclick=()=>{ts.mode="preset";ts.preset=b.dataset.p;ts.touched=true;drawTime()});
+  document.querySelectorAll("#tp [data-mode]").forEach(b=>b.onclick=()=>{ts.mode=b.dataset.mode;ts.touched=true;drawTime()});
+  const toCustom=()=>{ts.mode="custom";ts.touched=true;drawTime()};
+  $("#tpH").onchange=e=>{ts.h=Number(e.target.value);toCustom()};
+  $("#tpc").addEventListener("focusin",()=>{if(ts.mode!=="custom")toCustom()});
+  document.querySelectorAll("#tpM [data-m]").forEach(b=>b.onclick=()=>{ts.m=b.dataset.m;toCustom()});
+  document.querySelectorAll("#tpA [data-a]").forEach(b=>b.onclick=()=>{ts.a=b.dataset.a;toCustom()});
+  $("#fDate").addEventListener("change",()=>{if(isNew&&!isDup&&!ts.touched)autoPick();drawTime()});
   drawTime();
 
   const drawMedia=()=>{
