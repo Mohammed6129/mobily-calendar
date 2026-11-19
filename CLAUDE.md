@@ -24,7 +24,9 @@ Live at https://mobily-calendar.vercel.app — every push to `main` deploys auto
 - Time picker: one-tap presets 11:00 / 15:00 / 19:00 (marked «محجوز» if another post that day uses it; new posts auto-pick the first free one), plus «وقت ثاني» (hour select, minutes 00/15/30/45, AM ☀ / PM ☾) and «بدون وقت».
 - Date picker: a week strip with post-count dots per day, plus an optional month grid.
 - «آخر التحديثات» sidebar on the left (content changes + dev commits); it can be hidden, and the choice is remembered per browser.
-- Post cards are compact (~200px wide).
+- Main view is **weeks as rows, days as columns** (`renderWeeks`). Each post is a mini item (thumb, time, name) with icons: eye (preview), edit, duplicate, delete. Empty weeks/days stay compact. Drag a post onto another day to move it. The old list/month views (`renderList`, `renderMonth`, `card`) are no longer used.
+- The eye (or clicking the post) opens a floating preview next to it (bottom sheet on phones): design, name, date/time, not-ready badges, full caption with copy, links, platform short links with copy, and move/edit/duplicate/delete.
+- Duplicates: posts with the same caption (or the same name when there is no caption) get an «xN» badge on every copy, whether they were copied with the duplicate button or added by hand (`dupKey`).
 - Excel export always uses Mobily's brand fonts (Ali, 19 Nov 2026): `Mobily_Headline_v7` bold for title, headers, day, time, platform names and Open links; `Mobily_Text_v7` for captions, URLs and everything else. Never Arial or Calibri. Constants `XF_HEAD` / `XF_TEXT` in `index.html`; a final sweep sets the font on any cell left without one.
 - Excel export keeps the team's sheet layout (Date / Time / Post Name / Visual / Caption / Design / Animation / Platform / Landing Page), with an option to keep only the Snapchat link. Excel import finds columns by header text, so sheets with or without «Post Name» both import.
 - No approval buttons; the site is only for the two editors.
